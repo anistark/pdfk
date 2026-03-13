@@ -1,0 +1,7 @@
+# Internal planning docs
+plan/
+.claude
+.pi
+
+# Added by cargo
+/target

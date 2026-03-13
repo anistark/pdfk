@@ -1,0 +1,98 @@
+# Contributing to pdfk
+
+Thanks for your interest in contributing! This document covers everything you need to get set up and start working on pdfk.
+
+## Prerequisites
+
+- **Rust 1.85+** — Install via [rustup](https://rustup.rs/)
+- **just** — Task runner. Install via `cargo install just` or `brew install just`
+
+
+## Getting Started
+
+```sh
+git clone https://github.com/anistark/pdfk.git
+cd pdfk
+just build
+just test
+```
+
+## Available Commands
+
+Run `just` to see all available tasks:
+
+```sh
+just format        # Format code with rustfmt
+just format-check  # Check formatting without modifying
+just lint          # Run clippy lints (fails on warnings)
+just check         # Type-check without building
+just build         # Build debug binary
+just build-release # Build release binary
+just test          # Run all tests
+just run <args>    # Run the CLI (e.g. just run lock file.pdf --password test)
+just dev <args>    # Build and run in one step
+just clean         # Clean build artifacts
+```
+
+## How It Works
+
+The core flow for each command is:
+
+1. **CLI parsing** — `clap` parses args into the `Command` enum (`src/cli/mod.rs`)
+2. **Dispatch** — `commands/mod.rs` routes to the appropriate command handler
+3. **PDF I/O** — `pdf/reader.rs` loads and parses encryption dicts; `pdf/writer.rs` handles encryption/decryption of objects and saving
+4. **Crypto** — `core/encryption.rs` implements AES-256 R5/R6 key derivation, password verification, and stream encryption per the PDF 2.0 spec
+
+## Testing
+
+Tests are split into two categories:
+
+### Unit tests
+
+Located alongside the source code in `#[cfg(test)]` modules. Run with:
+
+```sh
+just test
+```
+
+Key unit tests cover:
+- AES-256 encrypt/decrypt roundtrips
+- R6 key derivation and password verification
+- Permission flag encoding/decoding
+
+### Integration tests
+
+Located in `tests/integration_tests.rs`. These test the actual CLI binary using `assert_cmd`. Test fixtures are auto-generated via `tests/common/mod.rs` using `lopdf`.
+
+Tests cover all four commands, error paths (wrong password, missing file, already encrypted, etc.), stdin password input, and full lock→check→unlock roundtrips.
+
+## Adding a New Command
+
+1. Add the subcommand variant to `Command` in `src/cli/mod.rs`
+2. Create `src/commands/your_command.rs` with a public `execute` function
+3. Register it in `src/commands/mod.rs` (add `pub mod` and match arm in `dispatch`)
+4. Add integration tests in `tests/integration_tests.rs`
+
+## Code Style
+
+- **Minimal comments.** Use docstrings on public APIs, `TODO`/`FIXME` for known issues, and brief notes only where logic is non-obvious. Don't restate what the code does.
+- **Run `just lint`** before submitting. Clippy must pass with zero warnings.
+- **Run `just format`** to auto-format.
+
+## Dependencies
+
+All dependencies should be pinned to their latest **stable** version. Avoid release candidates. When adding a new crate, verify the version with `cargo search <crate>`.
+
+## Submitting Changes
+
+1. Fork the repo and create a feature branch
+2. Make your changes
+3. Ensure `just lint` and `just test` pass
+4. Write a clear, concise commit message
+5. Open a PR against `main`
+
+Keep PRs focused — one feature or fix per PR.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
