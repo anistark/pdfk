@@ -1,5 +1,7 @@
 # `pdfk` - PDF Kit
 
+[![Crates.io Version](https://img.shields.io/crates/v/pdfk)](https://crates.io/crates/pdfk) [![Crates.io Downloads](https://img.shields.io/crates/d/pdfk)](https://crates.io/crates/pdfk) [![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/pdfk)](https://crates.io/crates/pdfk) [![Open Source](https://img.shields.io/badge/open-source-brightgreen)](https://github.com/anistark/pdfk) ![maintenance-status](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Modern PDF CLI tool. 
 Fast, offline, secure.
 
