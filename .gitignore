@@ -1,7 +1,8 @@
-# Internal planning docs
+# Internal docs
 plan/
 .claude
 .pi
+.DS_Store
 
 # Added by cargo
 /target
