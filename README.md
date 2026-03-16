@@ -101,6 +101,46 @@ pdfk change-password encrypted.pdf --old --new
 printf "oldpass\nnewpass" | pdfk change-password encrypted.pdf --password-stdin
 ```
 
+### `info` — Display encryption details
+
+```sh
+pdfk info document.pdf
+```
+
+```
+File:         document.pdf
+Encrypted:    yes
+Algorithm:    AES-256
+Key length:   256 bits
+Revision:     R6
+Crypt filter: AESV3
+Permissions:
+  Print: allowed
+  Copy:  allowed
+  Edit:  denied
+```
+
+```sh
+# Machine-readable JSON output (for scripts and CI)
+pdfk info document.pdf --json
+```
+
+```json
+{
+  "file": "document.pdf",
+  "encrypted": true,
+  "algorithm": "AES-256",
+  "key_length": 256,
+  "revision": "R6",
+  "crypt_filter": "AESV3",
+  "permissions": {
+    "print": true,
+    "copy": true,
+    "edit": false
+  }
+}
+```
+
 ### `check` — Verify a password
 
 ```sh
@@ -158,6 +198,17 @@ Change passwords periodically on encrypted archives without decrypting to disk:
 
 ```sh
 printf "oldpass\nnewpass" | pdfk change-password archive.pdf --password-stdin --in-place
+```
+
+### Inspect encryption details before processing
+
+Check what encryption a PDF uses and what permissions are set — no password needed:
+
+```sh
+pdfk info document.pdf
+
+# Pipe JSON into jq for scripting
+pdfk info document.pdf --json | jq '.permissions'
 ```
 
 ### Verify passwords in scripts before proceeding

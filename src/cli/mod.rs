@@ -105,6 +105,16 @@ pub enum Command {
         in_place: bool,
     },
 
+    /// Display encryption details for a PDF
+    Info {
+        /// Input PDF file
+        file: PathBuf,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Verify a password works without modifying the file
     Check {
         /// Input PDF file

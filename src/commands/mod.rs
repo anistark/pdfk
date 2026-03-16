@@ -2,6 +2,7 @@ pub mod lock;
 pub mod unlock;
 pub mod change_password;
 pub mod check;
+pub mod info;
 
 use anyhow::Result;
 use crate::cli::{Cli, Command};
@@ -46,6 +47,10 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             output,
             in_place,
         } => change_password::execute(file, old, new, password_stdin, output, in_place),
+        Command::Info {
+            file,
+            json,
+        } => info::execute(file, json),
         Command::Check {
             file,
             password,

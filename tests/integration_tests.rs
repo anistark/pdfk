@@ -443,6 +443,138 @@ fn test_change_password_wrong_old() {
         .stderr(predicate::str::contains("Wrong password"));
 }
 
+// ==================== Info tests ====================
+
+#[test]
+fn test_info_unencrypted() {
+    pdfk()
+        .args(&["info", &sample_pdf()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+}
+
+#[test]
+fn test_info_encrypted() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["info", encrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted:    yes"))
+        .stdout(predicate::str::contains("Algorithm:    AES-256"))
+        .stdout(predicate::str::contains("Key length:   256 bits"))
+        .stdout(predicate::str::contains("Revision:     R6"))
+        .stdout(predicate::str::contains("Crypt filter: AESV3"))
+        .stdout(predicate::str::contains("Print: allowed"))
+        .stdout(predicate::str::contains("Copy:  allowed"))
+        .stdout(predicate::str::contains("Edit:  allowed"));
+}
+
+#[test]
+fn test_info_encrypted_with_permissions() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--no-print",
+            "--no-copy",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["info", encrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Print: denied"))
+        .stdout(predicate::str::contains("Copy:  denied"))
+        .stdout(predicate::str::contains("Edit:  allowed"));
+}
+
+#[test]
+fn test_info_json_unencrypted() {
+    let output = pdfk()
+        .args(&["info", &sample_pdf(), "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(json["encrypted"], false);
+    assert!(json.get("algorithm").is_none());
+    assert!(json.get("permissions").is_none());
+}
+
+#[test]
+fn test_info_json_encrypted() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--no-edit",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let output = pdfk()
+        .args(&["info", encrypted.to_str().unwrap(), "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(json["encrypted"], true);
+    assert_eq!(json["algorithm"], "AES-256");
+    assert_eq!(json["key_length"], 256);
+    assert_eq!(json["revision"], "R6");
+    assert_eq!(json["crypt_filter"], "AESV3");
+    assert_eq!(json["permissions"]["print"], true);
+    assert_eq!(json["permissions"]["copy"], true);
+    assert_eq!(json["permissions"]["edit"], false);
+}
+
+#[test]
+fn test_info_file_not_found() {
+    pdfk()
+        .args(&["info", "nonexistent.pdf"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("File not found"));
+}
+
 // ==================== Error path tests ====================
 
 #[test]
@@ -580,7 +712,7 @@ fn test_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("pdfk 0.1.2"));
+        .stdout(predicate::str::contains("pdfk 0.2.0"));
 }
 
 #[test]
