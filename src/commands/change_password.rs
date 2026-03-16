@@ -28,13 +28,7 @@ pub fn execute(
         );
     }
 
-    let (old_pass, new_pass) = if password_stdin {
-        password::read_two_passwords_stdin()?
-    } else {
-        let old_p = old.ok_or_else(|| anyhow::anyhow!("--old password is required"))?;
-        let new_p = new.ok_or_else(|| anyhow::anyhow!("--new password is required"))?;
-        (old_p, new_p)
-    };
+    let (old_pass, new_pass) = password::resolve_old_new_passwords(old, new, password_stdin)?;
 
     let enc_info = reader::parse_encryption_dict(&doc)?;
     let dec_key = try_recover_key(&enc_info, old_pass.as_bytes())?;

@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, IsTerminal};
 
 /// Read a single password from stdin
 pub fn read_password_stdin() -> Result<String> {
@@ -35,7 +35,17 @@ pub fn read_two_passwords_stdin() -> Result<(String, String)> {
     Ok((old, new))
 }
 
-/// Resolve password from --password or --password-stdin
+/// Prompt the user for a password interactively (hidden input, no echo).
+pub fn prompt_password_interactive(prompt: &str) -> Result<String> {
+    let password = rpassword::prompt_password(prompt)
+        .map_err(|e| anyhow::anyhow!("Failed to read password: {e}"))?;
+    if password.is_empty() {
+        bail!("Password must not be empty");
+    }
+    Ok(password)
+}
+
+/// Resolve password from --password, --password-stdin, or interactive prompt.
 pub fn resolve_password(password: Option<String>, password_stdin: bool) -> Result<String> {
     if let Some(p) = password {
         return Ok(p);
@@ -43,5 +53,37 @@ pub fn resolve_password(password: Option<String>, password_stdin: bool) -> Resul
     if password_stdin {
         return read_password_stdin();
     }
+    if io::stdin().is_terminal() {
+        return prompt_password_interactive("Enter password: ");
+    }
     bail!("No password provided. Use --password or --password-stdin")
+}
+
+/// Resolve old and new passwords from flags, stdin, or interactive prompts.
+pub fn resolve_old_new_passwords(
+    old: Option<String>,
+    new: Option<String>,
+    password_stdin: bool,
+) -> Result<(String, String)> {
+    if password_stdin {
+        return read_two_passwords_stdin();
+    }
+
+    let old_pass = match old {
+        Some(p) => p,
+        None if io::stdin().is_terminal() => {
+            prompt_password_interactive("Enter current password: ")?
+        }
+        None => bail!("--old password is required"),
+    };
+
+    let new_pass = match new {
+        Some(p) => p,
+        None if io::stdin().is_terminal() => {
+            prompt_password_interactive("Enter new password: ")?
+        }
+        None => bail!("--new password is required"),
+    };
+
+    Ok((old_pass, new_pass))
 }
