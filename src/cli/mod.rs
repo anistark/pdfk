@@ -20,8 +20,8 @@ pub enum Command {
         /// Input PDF file
         file: PathBuf,
 
-        /// Password (sets both user & owner password)
-        #[arg(long, group = "password_source")]
+        /// Password (sets both user & owner password; prompts if omitted)
+        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin
@@ -62,8 +62,8 @@ pub enum Command {
         /// Input PDF file
         file: PathBuf,
 
-        /// Password
-        #[arg(long, group = "password_source")]
+        /// Password (prompts interactively if value is omitted)
+        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin
@@ -84,12 +84,12 @@ pub enum Command {
         /// Input PDF file
         file: PathBuf,
 
-        /// Current password
-        #[arg(long)]
+        /// Current password (prompts interactively if value is omitted)
+        #[arg(long, num_args = 0..=1, default_missing_value = "")]
         old: Option<String>,
 
-        /// New password
-        #[arg(long)]
+        /// New password (prompts interactively if value is omitted)
+        #[arg(long, num_args = 0..=1, default_missing_value = "")]
         new: Option<String>,
 
         /// Read passwords from stdin (old then new, one per line)
@@ -110,8 +110,8 @@ pub enum Command {
         /// Input PDF file
         file: PathBuf,
 
-        /// Password to verify
-        #[arg(long, group = "password_source")]
+        /// Password to verify (prompts interactively if value is omitted)
+        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin

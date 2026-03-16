@@ -47,13 +47,16 @@ pub fn prompt_password_interactive(prompt: &str) -> Result<String> {
 
 /// Resolve password from --password, --password-stdin, or interactive prompt.
 pub fn resolve_password(password: Option<String>, password_stdin: bool) -> Result<String> {
-    if let Some(p) = password {
-        return Ok(p);
+    if let Some(ref p) = password {
+        if !p.is_empty() {
+            return Ok(p.clone());
+        }
     }
     if password_stdin {
         return read_password_stdin();
     }
-    if io::stdin().is_terminal() {
+    if password.is_some() || io::stdin().is_terminal() {
+        // Bare --password (no value) or no flag at all with a TTY
         return prompt_password_interactive("Enter password: ");
     }
     bail!("No password provided. Use --password or --password-stdin")
@@ -70,19 +73,19 @@ pub fn resolve_old_new_passwords(
     }
 
     let old_pass = match old {
-        Some(p) => p,
-        None if io::stdin().is_terminal() => {
+        Some(ref p) if !p.is_empty() => p.clone(),
+        Some(_) | None if io::stdin().is_terminal() => {
             prompt_password_interactive("Enter current password: ")?
         }
-        None => bail!("--old password is required"),
+        _ => bail!("--old password is required"),
     };
 
     let new_pass = match new {
-        Some(p) => p,
-        None if io::stdin().is_terminal() => {
+        Some(ref p) if !p.is_empty() => p.clone(),
+        Some(_) | None if io::stdin().is_terminal() => {
             prompt_password_interactive("Enter new password: ")?
         }
-        None => bail!("--new password is required"),
+        _ => bail!("--new password is required"),
     };
 
     Ok((old_pass, new_pass))
