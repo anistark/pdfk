@@ -5,7 +5,7 @@ All notable changes to pdfk will be documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-03-16
+## [0.2.0](https://github.com/anistark/pdfk/compare/v0.1.1...v0.2.0) - 2026-03-16
 
 ### Added
 - **`pdfk info` command**: Display encryption details for any PDF without a password
@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `serde` 1.0 with derive feature
 - Added `serde_json` 1.0
 
-## [0.1.1] - 2026-03-16
+## [0.1.1](https://github.com/anistark/pdfk/compare/v0.1.0...v0.1.1) - 2026-03-16
 
 ### Added
 - **Interactive password prompts**: Bare `--password` (no value) triggers a hidden interactive prompt via `rpassword` — nothing in shell history or `ps` output
@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unlock producing empty/invalid PDFs**: Use `lopdf::Document::load_with_password()` for decryption instead of manual per-object decryption, which failed on encrypted PDFs with non-empty user passwords (doc.objects was empty). Unlocked PDFs now pass `qpdf --check` validation.
 - Removed dead manual decryption code from writer.rs
 
-## [0.1.0] - 2026-03-13
+## [0.1.0](https://github.com/anistark/pdfk/releases/tag/v0.1.0) - 2026-03-13
 
 ### Added
 - Initial release of pdfk
@@ -69,7 +69,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clear error messages for: wrong password, file not found, invalid PDF, not encrypted, already encrypted, unsupported revision
 - 18 unit tests + 24 integration tests using `assert_cmd`
 - Published to [crates.io](https://crates.io/crates/pdfk)
-
-[0.2.0]: https://github.com/anistark/pdfk/compare/v0.1.1...v0.2.0
-[0.1.1]: https://github.com/anistark/pdfk/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/anistark/pdfk/releases/tag/v0.1.0

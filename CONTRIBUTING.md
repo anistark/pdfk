@@ -31,6 +31,8 @@ just build-release # Build release binary
 just test          # Run all tests
 just run <args>    # Run the CLI (e.g. just run lock file.pdf --password test)
 just dev <args>    # Build and run in one step
+just publish-test  # Dry-run publish to crates.io
+just publish       # Publish to crates.io
 just clean         # Clean build artifacts
 ```
 
@@ -40,8 +42,9 @@ The core flow for each command is:
 
 1. **CLI parsing** — `clap` parses args into the `Command` enum (`src/cli/mod.rs`)
 2. **Dispatch** — `commands/mod.rs` routes to the appropriate command handler
-3. **PDF I/O** — `pdf/reader.rs` loads and parses encryption dicts; `pdf/writer.rs` handles encryption/decryption of objects and saving
-4. **Crypto** — `core/encryption.rs` implements AES-256 R5/R6 key derivation, password verification, and stream encryption per the PDF 2.0 spec
+3. **PDF I/O** — `pdf/reader.rs` loads and parses encryption dicts; `pdf/writer.rs` handles encryption of objects and saving
+4. **Crypto** — `core/encryption.rs` implements R3/R4/R5/R6 key derivation, password verification, and AES-256 stream encryption per the PDF spec
+5. **Permissions** — `core/permissions.rs` encodes/decodes the P value permission bits (print, copy, edit)
 
 ## Testing
 
@@ -56,15 +59,19 @@ just test
 ```
 
 Key unit tests cover:
-- AES-256 encrypt/decrypt roundtrips
-- R6 key derivation and password verification
+- AES-256 and AES-128 encrypt/decrypt roundtrips
+- R6 and R5 key derivation and password verification
+- R3/R4 legacy password verification (user + owner)
+- RC4 cipher roundtrips
+- Per-object key derivation (RC4, AES-128)
+- Password padding
 - Permission flag encoding/decoding
 
 ### Integration tests
 
 Located in `tests/integration_tests.rs`. These test the actual CLI binary using `assert_cmd`. Test fixtures are auto-generated via `tests/common/mod.rs` using `lopdf`.
 
-Tests cover all four commands, error paths (wrong password, missing file, already encrypted, etc.), stdin password input, and full lock→check→unlock roundtrips.
+Tests cover all five commands (lock, unlock, change-password, check, info), error paths (wrong password, missing file, already encrypted, etc.), stdin password input, JSON output validation, and full lock→check→unlock roundtrips.
 
 ## Adding a New Command
 
@@ -92,6 +99,10 @@ All dependencies should be pinned to their latest **stable** version. Avoid rele
 5. Open a PR against `main`
 
 Keep PRs focused — one feature or fix per PR.
+
+## Changelog
+
+Update [CHANGELOG.md](./CHANGELOG.md) when adding features or fixing bugs. Follow the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format with `Added`, `Fixed`, `Changed`, `Dependencies` categories.
 
 ## License
 
