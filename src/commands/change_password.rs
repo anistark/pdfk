@@ -1,10 +1,9 @@
 use anyhow::{bail, Result};
 use std::path::{Path, PathBuf};
 
-use crate::core::encryption;
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
-use crate::pdf::writer::{self, CipherMode, DecryptionKey, EncryptParams};
+use crate::pdf::writer::{self, EncryptParams};
 use crate::utils::{display_path, password, print_success};
 
 pub fn execute(
@@ -19,8 +18,8 @@ pub fn execute(
         bail!("File not found: {}", display_path(&file));
     }
 
-    let mut doc = reader::load_pdf(&file)?;
-
+    // Load without password first to check encryption and read permissions.
+    let doc = reader::load_pdf(&file)?;
     if !reader::is_encrypted(&doc) {
         bail!(
             "File is not encrypted: {}\nUse `pdfk lock` to encrypt it first.",
@@ -28,24 +27,25 @@ pub fn execute(
         );
     }
 
+    let enc_info = reader::parse_encryption_dict(&doc)?;
+    let permissions = PdfPermissions::from_p_value(enc_info.p_value);
+    drop(doc);
+
     let (old_pass, new_pass) = password::resolve_old_new_passwords(old, new, password_stdin)?;
 
-    let enc_info = reader::parse_encryption_dict(&doc)?;
-    let dec_key = try_recover_key(&enc_info, old_pass.as_bytes())?;
+    // Load and decrypt using lopdf's built-in decryption.
+    let mut decrypted_doc = reader::load_pdf_decrypted(&file, &old_pass)?;
 
-    writer::decrypt_pdf(&mut doc, &dec_key)?;
-
-    let permissions = PdfPermissions::from_p_value(enc_info.p_value);
+    // Re-encrypt with the new password.
     let params = EncryptParams {
         user_password: new_pass.clone().into_bytes(),
         owner_password: new_pass.into_bytes(),
         permissions,
     };
-
-    writer::encrypt_pdf(&mut doc, &params)?;
+    writer::encrypt_pdf(&mut decrypted_doc, &params)?;
 
     let output_path = resolve_output_path(&file, output, in_place)?;
-    writer::save_pdf(&mut doc, &output_path)?;
+    writer::save_pdf(&mut decrypted_doc, &output_path)?;
 
     print_success(&format!(
         "Password changed: {} → {}",
@@ -54,66 +54,6 @@ pub fn execute(
     ));
 
     Ok(())
-}
-
-fn try_recover_key(
-    enc_info: &reader::EncryptionInfo,
-    password: &[u8],
-) -> Result<DecryptionKey> {
-    match enc_info.revision {
-        6 => {
-            if let Some(key) = encryption::verify_user_password_r6(password, &enc_info.u_value, &enc_info.ue_value) {
-                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
-            }
-            if let Some(key) = encryption::verify_owner_password_r6(password, &enc_info.o_value, &enc_info.oe_value, &enc_info.u_value) {
-                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
-            }
-            bail!("Wrong password")
-        }
-        5 => {
-            if let Some(key) = encryption::verify_user_password_r5(password, &enc_info.u_value, &enc_info.ue_value) {
-                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
-            }
-            if let Some(key) = encryption::verify_owner_password_r5(password, &enc_info.o_value, &enc_info.oe_value, &enc_info.u_value) {
-                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
-            }
-            bail!("Wrong password")
-        }
-        3 | 4 => {
-            let key_length_bytes = (enc_info.key_length / 8) as usize;
-            let cipher_mode = cipher_mode_for_legacy(enc_info);
-
-            if let Some(key) = encryption::verify_user_password_legacy(
-                password, &enc_info.u_value, &enc_info.o_value,
-                enc_info.p_value, &enc_info.file_id, key_length_bytes,
-                enc_info.revision, enc_info.encrypt_metadata,
-            ) {
-                return Ok(DecryptionKey { file_key: key, cipher_mode });
-            }
-            if let Some(key) = encryption::verify_owner_password_legacy(
-                password, &enc_info.u_value, &enc_info.o_value,
-                enc_info.p_value, &enc_info.file_id, key_length_bytes,
-                enc_info.revision, enc_info.encrypt_metadata,
-            ) {
-                return Ok(DecryptionKey { file_key: key, cipher_mode });
-            }
-            bail!("Wrong password")
-        }
-        r => bail!("Unsupported encryption revision: R{r}"),
-    }
-}
-
-/// Determine the cipher mode for R3/R4 from the encryption info.
-fn cipher_mode_for_legacy(enc_info: &reader::EncryptionInfo) -> CipherMode {
-    if enc_info.revision == 4 {
-        match enc_info.stm_cfm.as_deref() {
-            Some("AESV2") => CipherMode::Aes128,
-            _ => CipherMode::Rc4,
-        }
-    } else {
-        // R3 is always RC4
-        CipherMode::Rc4
-    }
 }
 
 fn resolve_output_path(input: &Path, output: Option<PathBuf>, in_place: bool) -> Result<PathBuf> {

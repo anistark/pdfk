@@ -6,6 +6,7 @@
 //! R6: ISO 32000-2:2020 (PDF 2.0) — AES-256
 
 use aes::cipher::{block_padding::NoPadding, BlockDecryptMut, BlockEncryptMut, KeyInit, KeyIvInit};
+#[cfg(test)]
 use anyhow::{bail, Result};
 use md5::Md5;
 use rand::RngExt;
@@ -13,6 +14,7 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 
 type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
+#[cfg(test)]
 type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
 
 pub const KEY_LEN: usize = 32;
@@ -204,6 +206,7 @@ pub fn rc4_transform(key: &[u8], data: &[u8]) -> Vec<u8> {
 
 /// Compute a per-object decryption key for RC4 (R3/R4 with V2).
 /// Algorithm 1 from the PDF spec.
+#[cfg(test)]
 pub fn compute_object_key_rc4(file_key: &[u8], obj_num: u32, gen_num: u16) -> Vec<u8> {
     let mut data = file_key.to_vec();
     data.push((obj_num & 0xFF) as u8);
@@ -219,6 +222,7 @@ pub fn compute_object_key_rc4(file_key: &[u8], obj_num: u32, gen_num: u16) -> Ve
 
 /// Compute a per-object decryption key for AES-128 (R4 with AESV2).
 /// Algorithm 1 with the extra "sAlT" suffix.
+#[cfg(test)]
 pub fn compute_object_key_aes128(file_key: &[u8], obj_num: u32, gen_num: u16) -> Vec<u8> {
     let mut data = file_key.to_vec();
     data.push((obj_num & 0xFF) as u8);
@@ -234,6 +238,7 @@ pub fn compute_object_key_aes128(file_key: &[u8], obj_num: u32, gen_num: u16) ->
 }
 
 /// Decrypt data with AES-128-CBC. First 16 bytes are IV, strips PKCS#7 padding.
+#[cfg(test)]
 pub fn decrypt_stream_aes128(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
     if ciphertext.len() < 32 {
         bail!("Ciphertext too short for AES-128-CBC");
@@ -566,6 +571,7 @@ pub fn encrypt_stream_aes256(key: &[u8; KEY_LEN], plaintext: &[u8]) -> Vec<u8> {
 }
 
 /// Decrypt PDF stream data with AES-256-CBC. First 16 bytes are IV, strips PKCS#7 padding.
+#[cfg(test)]
 pub fn decrypt_stream_aes256(key: &[u8; KEY_LEN], ciphertext: &[u8]) -> Result<Vec<u8>> {
     if ciphertext.len() < 16 {
         bail!("Ciphertext too short for AES-256-CBC");

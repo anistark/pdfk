@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use lopdf::{Document, Object, ObjectId};
+use lopdf::{Document, Object};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -26,6 +26,19 @@ pub struct EncryptionInfo {
 pub fn load_pdf(path: &Path) -> Result<Document> {
     Document::load(path)
         .with_context(|| format!("Failed to load PDF: {}", path.display()))
+}
+
+/// Load an encrypted PDF, decrypting it with the given password.
+/// Returns the fully decrypted document with all objects populated.
+pub fn load_pdf_decrypted(path: &Path, password: &str) -> Result<Document> {
+    Document::load_with_password(path, password).map_err(|e| {
+        let msg = format!("{e}");
+        if msg.to_lowercase().contains("password") {
+            anyhow::anyhow!("Wrong password")
+        } else {
+            anyhow::anyhow!("Failed to load/decrypt PDF: {}: {e}", path.display())
+        }
+    })
 }
 
 pub fn is_encrypted(doc: &Document) -> bool {
@@ -92,13 +105,6 @@ pub fn parse_encryption_dict(doc: &Document) -> Result<EncryptionInfo> {
         u_value, o_value, ue_value, oe_value, perms_value, encrypt_metadata,
         file_id, stm_cfm,
     })
-}
-
-pub fn get_encrypt_object_id(doc: &Document) -> Option<ObjectId> {
-    match doc.trailer.get(b"Encrypt") {
-        Ok(Object::Reference(id)) => Some(*id),
-        _ => None,
-    }
 }
 
 fn extract_bytes(dict: &lopdf::Dictionary, key: &[u8]) -> Option<Vec<u8>> {
