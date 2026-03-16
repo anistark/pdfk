@@ -33,7 +33,20 @@ pub fn execute(
             encryption::verify_user_password_r5(pass.as_bytes(), &enc_info.u_value, &enc_info.ue_value).is_some()
                 || encryption::verify_owner_password_r5(pass.as_bytes(), &enc_info.o_value, &enc_info.oe_value, &enc_info.u_value).is_some()
         }
-        r => bail!("Unsupported encryption revision: R{r}. pdfk v0.1 supports AES-256 (R5/R6) only."),
+        3 | 4 => {
+            let key_length_bytes = (enc_info.key_length / 8) as usize;
+            encryption::verify_user_password_legacy(
+                pass.as_bytes(), &enc_info.u_value, &enc_info.o_value,
+                enc_info.p_value, &enc_info.file_id, key_length_bytes,
+                enc_info.revision, enc_info.encrypt_metadata,
+            ).is_some()
+                || encryption::verify_owner_password_legacy(
+                pass.as_bytes(), &enc_info.u_value, &enc_info.o_value,
+                enc_info.p_value, &enc_info.file_id, key_length_bytes,
+                enc_info.revision, enc_info.encrypt_metadata,
+            ).is_some()
+        }
+        r => bail!("Unsupported encryption revision: R{r}"),
     };
 
     if valid {

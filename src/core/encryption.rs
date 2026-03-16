@@ -1,17 +1,268 @@
-//! PDF AES-256 encryption/decryption (Revision 5 and 6).
+//! PDF encryption/decryption support.
 //!
-//! R5: Adobe Supplement to ISO 32000-1 (Extension Level 3)
-//! R6: ISO 32000-2:2020 (PDF 2.0)
+//! R3: PDF 1.4 — RC4, up to 128-bit keys
+//! R4: PDF 1.5–1.7 — AES-128 or RC4, 128-bit keys
+//! R5: Adobe Supplement to ISO 32000-1 (Extension Level 3) — AES-256
+//! R6: ISO 32000-2:2020 (PDF 2.0) — AES-256
 
 use aes::cipher::{block_padding::NoPadding, BlockDecryptMut, BlockEncryptMut, KeyInit, KeyIvInit};
 use anyhow::{bail, Result};
+use md5::Md5;
 use rand::RngExt;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 
 type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
+type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
 
 pub const KEY_LEN: usize = 32;
+
+// ======================================================================
+// R3/R4 support: MD5-based key derivation, RC4, AES-128
+// ======================================================================
+
+/// Standard PDF password padding string (Table 2 / Appendix A in PDF spec).
+pub const PASSWORD_PADDING: [u8; 32] = [
+    0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41,
+    0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
+    0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80,
+    0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
+];
+
+/// Pad or truncate a password to exactly 32 bytes using the PDF padding string.
+fn pad_password(password: &[u8]) -> [u8; 32] {
+    let mut padded = [0u8; 32];
+    let len = password.len().min(32);
+    padded[..len].copy_from_slice(&password[..len]);
+    padded[len..].copy_from_slice(&PASSWORD_PADDING[..32 - len]);
+    padded
+}
+
+/// Algorithm 2: Compute the file encryption key from a user password (R2/R3/R4).
+pub fn compute_encryption_key(
+    password: &[u8],
+    o_value: &[u8],
+    p_value: i32,
+    file_id: &[u8],
+    key_length_bytes: usize,
+    revision: i64,
+    encrypt_metadata: bool,
+) -> Vec<u8> {
+    let padded = pad_password(password);
+    let mut hasher = Md5::new();
+    hasher.update(padded);
+    hasher.update(o_value);
+    hasher.update((p_value as u32).to_le_bytes());
+    hasher.update(file_id);
+    if revision >= 4 && !encrypt_metadata {
+        hasher.update([0xFF, 0xFF, 0xFF, 0xFF]);
+    }
+    let mut hash = hasher.finalize().to_vec();
+
+    if revision >= 3 {
+        for _ in 0..50 {
+            let digest = Md5::digest(&hash[..key_length_bytes]);
+            hash = digest.to_vec();
+        }
+    }
+
+    hash.truncate(key_length_bytes);
+    hash
+}
+
+/// Algorithm 3 (partial): Compute the RC4 key derived from the owner password.
+fn compute_o_key(owner_password: &[u8], key_length_bytes: usize, revision: i64) -> Vec<u8> {
+    let padded = pad_password(owner_password);
+    let mut hash = Md5::digest(padded).to_vec();
+
+    if revision >= 3 {
+        for _ in 0..50 {
+            let digest = Md5::digest(&hash[..key_length_bytes]);
+            hash = digest.to_vec();
+        }
+    }
+
+    hash.truncate(key_length_bytes);
+    hash
+}
+
+/// Algorithm 4/5: Compute the U value for password verification.
+pub fn compute_u_value(
+    key: &[u8],
+    file_id: &[u8],
+    revision: i64,
+) -> Vec<u8> {
+    if revision == 2 {
+        // Algorithm 4: RC4 encrypt the padding string
+        rc4_transform(key, &PASSWORD_PADDING)
+    } else {
+        // Algorithm 5: R3/R4
+        let mut hasher = Md5::new();
+        hasher.update(PASSWORD_PADDING);
+        hasher.update(file_id);
+        let hash = hasher.finalize().to_vec();
+
+        let mut result = rc4_transform(key, &hash);
+        for i in 1..=19u8 {
+            let modified_key: Vec<u8> = key.iter().map(|&b| b ^ i).collect();
+            result = rc4_transform(&modified_key, &result);
+        }
+
+        // Pad to 32 bytes with arbitrary data
+        result.resize(32, 0);
+        result
+    }
+}
+
+/// Verify a user password for R2/R3/R4. Returns the file encryption key on success.
+pub fn verify_user_password_legacy(
+    password: &[u8],
+    u_value: &[u8],
+    o_value: &[u8],
+    p_value: i32,
+    file_id: &[u8],
+    key_length_bytes: usize,
+    revision: i64,
+    encrypt_metadata: bool,
+) -> Option<Vec<u8>> {
+    let key = compute_encryption_key(
+        password, o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+    );
+    let computed_u = compute_u_value(&key, file_id, revision);
+
+    if revision == 2 {
+        if computed_u == u_value {
+            Some(key)
+        } else {
+            None
+        }
+    } else {
+        // For R3/R4, only compare the first 16 bytes
+        if computed_u.len() >= 16 && u_value.len() >= 16 && computed_u[..16] == u_value[..16] {
+            Some(key)
+        } else {
+            None
+        }
+    }
+}
+
+/// Verify an owner password for R2/R3/R4.
+/// Decrypts the O value to recover the user password, then verifies it.
+pub fn verify_owner_password_legacy(
+    password: &[u8],
+    u_value: &[u8],
+    o_value: &[u8],
+    p_value: i32,
+    file_id: &[u8],
+    key_length_bytes: usize,
+    revision: i64,
+    encrypt_metadata: bool,
+) -> Option<Vec<u8>> {
+    let o_key = compute_o_key(password, key_length_bytes, revision);
+
+    // Decrypt O value to recover padded user password
+    let mut user_password = o_value.to_vec();
+    if revision == 2 {
+        user_password = rc4_transform(&o_key, &user_password);
+    } else {
+        // R3/R4: iterate RC4 in reverse order
+        for i in (0..=19u8).rev() {
+            let modified_key: Vec<u8> = o_key.iter().map(|&b| b ^ i).collect();
+            user_password = rc4_transform(&modified_key, &user_password);
+        }
+    }
+
+    // Verify with the recovered user password
+    verify_user_password_legacy(
+        &user_password, u_value, o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+    )
+}
+
+/// RC4 encrypt/decrypt (symmetric). Manual implementation for variable-length keys.
+pub fn rc4_transform(key: &[u8], data: &[u8]) -> Vec<u8> {
+    // KSA (Key-Scheduling Algorithm)
+    let mut s: Vec<u8> = (0u16..=255).map(|i| i as u8).collect();
+    let mut j: u8 = 0;
+    for i in 0..256usize {
+        j = j.wrapping_add(s[i]).wrapping_add(key[i % key.len()]);
+        s.swap(i, j as usize);
+    }
+
+    // PRGA (Pseudo-Random Generation Algorithm)
+    let mut i: u8 = 0;
+    j = 0;
+    let mut output = data.to_vec();
+    for byte in output.iter_mut() {
+        i = i.wrapping_add(1);
+        j = j.wrapping_add(s[i as usize]);
+        s.swap(i as usize, j as usize);
+        let k = s[(s[i as usize].wrapping_add(s[j as usize])) as usize];
+        *byte ^= k;
+    }
+    output
+}
+
+/// Compute a per-object decryption key for RC4 (R3/R4 with V2).
+/// Algorithm 1 from the PDF spec.
+pub fn compute_object_key_rc4(file_key: &[u8], obj_num: u32, gen_num: u16) -> Vec<u8> {
+    let mut data = file_key.to_vec();
+    data.push((obj_num & 0xFF) as u8);
+    data.push(((obj_num >> 8) & 0xFF) as u8);
+    data.push(((obj_num >> 16) & 0xFF) as u8);
+    data.push((gen_num & 0xFF) as u8);
+    data.push(((gen_num >> 8) & 0xFF) as u8);
+
+    let hash = Md5::digest(&data);
+    let key_len = (file_key.len() + 5).min(16);
+    hash[..key_len].to_vec()
+}
+
+/// Compute a per-object decryption key for AES-128 (R4 with AESV2).
+/// Algorithm 1 with the extra "sAlT" suffix.
+pub fn compute_object_key_aes128(file_key: &[u8], obj_num: u32, gen_num: u16) -> Vec<u8> {
+    let mut data = file_key.to_vec();
+    data.push((obj_num & 0xFF) as u8);
+    data.push(((obj_num >> 8) & 0xFF) as u8);
+    data.push(((obj_num >> 16) & 0xFF) as u8);
+    data.push((gen_num & 0xFF) as u8);
+    data.push(((gen_num >> 8) & 0xFF) as u8);
+    data.extend_from_slice(b"sAlT");
+
+    let hash = Md5::digest(&data);
+    let key_len = (file_key.len() + 5).min(16);
+    hash[..key_len].to_vec()
+}
+
+/// Decrypt data with AES-128-CBC. First 16 bytes are IV, strips PKCS#7 padding.
+pub fn decrypt_stream_aes128(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
+    if ciphertext.len() < 32 {
+        bail!("Ciphertext too short for AES-128-CBC");
+    }
+    let iv = &ciphertext[..16];
+    let ct = &ciphertext[16..];
+    if ct.is_empty() || ct.len() % 16 != 0 {
+        bail!("Invalid ciphertext length for AES-128-CBC");
+    }
+
+    let mut buf = ct.to_vec();
+    let result = Aes128CbcDec::new_from_slices(key, iv)
+        .map_err(|_| anyhow::anyhow!("AES-128-CBC key/iv init failed"))?
+        .decrypt_padded_mut::<NoPadding>(&mut buf)
+        .map_err(|_| anyhow::anyhow!("AES-128-CBC decryption failed"))?;
+    let decrypted = result.to_vec();
+
+    // Strip PKCS#7 padding
+    if let Some(&pad_byte) = decrypted.last() {
+        let pad_len = pad_byte as usize;
+        if pad_len > 0 && pad_len <= 16 && pad_len <= decrypted.len()
+            && decrypted[decrypted.len() - pad_len..].iter().all(|&b| b == pad_byte)
+        {
+            return Ok(decrypted[..decrypted.len() - pad_len].to_vec());
+        }
+    }
+
+    Ok(decrypted)
+}
 
 pub fn generate_file_encryption_key() -> [u8; KEY_LEN] {
     let mut key = [0u8; KEY_LEN];
@@ -410,5 +661,169 @@ mod tests {
         assert!(decoded.allow_print);
         assert!(!decoded.allow_copy);
         assert!(decoded.allow_edit);
+    }
+
+    // --- R3/R4 tests ---
+
+    #[test]
+    fn test_rc4_roundtrip() {
+        let key = b"testkey123";
+        let plaintext = b"Hello, PDF encryption with RC4!";
+        let ciphertext = rc4_transform(key, plaintext);
+        let decrypted = rc4_transform(key, &ciphertext);
+        assert_eq!(decrypted, plaintext.to_vec());
+    }
+
+    #[test]
+    fn test_rc4_empty_data() {
+        let key = b"key";
+        let ciphertext = rc4_transform(key, b"");
+        assert!(ciphertext.is_empty());
+    }
+
+    #[test]
+    fn test_pad_password_short() {
+        let padded = pad_password(b"abc");
+        assert_eq!(&padded[..3], b"abc");
+        assert_eq!(&padded[3..], &PASSWORD_PADDING[..29]);
+    }
+
+    #[test]
+    fn test_pad_password_empty() {
+        let padded = pad_password(b"");
+        assert_eq!(padded, PASSWORD_PADDING);
+    }
+
+    #[test]
+    fn test_pad_password_full() {
+        let pass = [0x41u8; 32]; // 32 'A's
+        let padded = pad_password(&pass);
+        assert_eq!(padded, pass);
+    }
+
+    #[test]
+    fn test_pad_password_too_long() {
+        let pass = [0x42u8; 64]; // 64 bytes, should be truncated to 32
+        let padded = pad_password(&pass);
+        assert_eq!(padded, [0x42u8; 32]);
+    }
+
+    #[test]
+    fn test_legacy_user_password_r3_roundtrip() {
+        // Simulate an R3 encryption setup and verify the user password
+        let password = b"testpass";
+        let file_id = b"0123456789abcdef";
+        let key_length_bytes = 16; // 128-bit
+        let revision = 3i64;
+        let p_value = -4i32; // typical
+        let encrypt_metadata = true;
+
+        // Compute O value (Algorithm 3): encrypt padded user password with owner key
+        let owner_password = b"ownerpass";
+        let o_key = super::compute_o_key(owner_password, key_length_bytes, revision);
+        let padded_user = pad_password(password);
+        let mut o_value = rc4_transform(&o_key, &padded_user);
+        for i in 1..=19u8 {
+            let modified_key: Vec<u8> = o_key.iter().map(|&b| b ^ i).collect();
+            o_value = rc4_transform(&modified_key, &o_value);
+        }
+
+        // Compute encryption key
+        let key = compute_encryption_key(
+            password, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        );
+        assert_eq!(key.len(), key_length_bytes);
+
+        // Compute U value
+        let u_value = compute_u_value(&key, file_id, revision);
+        assert_eq!(u_value.len(), 32);
+
+        // Verify user password
+        let recovered = verify_user_password_legacy(
+            password, &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        );
+        assert!(recovered.is_some());
+        assert_eq!(recovered.unwrap(), key);
+
+        // Wrong password should fail
+        let wrong = verify_user_password_legacy(
+            b"wrongpass", &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        );
+        assert!(wrong.is_none());
+    }
+
+    #[test]
+    fn test_legacy_owner_password_r3_roundtrip() {
+        let user_password = b"userpass";
+        let owner_password = b"ownerpass";
+        let file_id = b"abcdef0123456789";
+        let key_length_bytes = 16;
+        let revision = 3i64;
+        let p_value = -4i32;
+        let encrypt_metadata = true;
+
+        // Compute O value
+        let o_key = super::compute_o_key(owner_password, key_length_bytes, revision);
+        let padded_user = pad_password(user_password);
+        let mut o_value = rc4_transform(&o_key, &padded_user);
+        for i in 1..=19u8 {
+            let modified_key: Vec<u8> = o_key.iter().map(|&b| b ^ i).collect();
+            o_value = rc4_transform(&modified_key, &o_value);
+        }
+
+        // Compute encryption key from user password
+        let key = compute_encryption_key(
+            user_password, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        );
+        let u_value = compute_u_value(&key, file_id, revision);
+
+        // Verify owner password recovers the same key
+        let recovered = verify_owner_password_legacy(
+            owner_password, &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        );
+        assert!(recovered.is_some());
+        assert_eq!(recovered.unwrap(), key);
+    }
+
+    #[test]
+    fn test_per_object_key_rc4() {
+        let file_key = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                           0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10];
+        let key1 = compute_object_key_rc4(&file_key, 1, 0);
+        let key2 = compute_object_key_rc4(&file_key, 2, 0);
+        // Different objects should produce different keys
+        assert_ne!(key1, key2);
+        // Key length should be min(file_key.len() + 5, 16)
+        assert_eq!(key1.len(), 16);
+    }
+
+    #[test]
+    fn test_per_object_key_aes128() {
+        let file_key = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                           0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10];
+        let key_rc4 = compute_object_key_rc4(&file_key, 1, 0);
+        let key_aes = compute_object_key_aes128(&file_key, 1, 0);
+        // AES key includes "sAlT" so should differ from RC4 key
+        assert_ne!(key_rc4, key_aes);
+    }
+
+    #[test]
+    fn test_aes128_decrypt_roundtrip() {
+        // Encrypt with AES-128-CBC then decrypt
+        let key = [0x42u8; 16];
+        let plaintext = b"Hello AES-128!";
+
+        // Manually encrypt: IV + AES-128-CBC + PKCS#7 padding
+        let iv = [0x00u8; 16];
+        let pad_len = 16 - (plaintext.len() % 16);
+        let mut padded = plaintext.to_vec();
+        padded.extend(vec![pad_len as u8; pad_len]);
+
+        let encrypted = super::aes128_cbc_encrypt(&key, &iv, &padded);
+        let mut ciphertext = iv.to_vec();
+        ciphertext.extend(encrypted);
+
+        let decrypted = decrypt_stream_aes128(&key, &ciphertext).unwrap();
+        assert_eq!(decrypted, plaintext.to_vec());
     }
 }

@@ -14,6 +14,23 @@ pub struct EncryptParams {
     pub permissions: PdfPermissions,
 }
 
+/// Which cipher is used for stream/string decryption.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CipherMode {
+    /// RC4 — used by R2, R3, and R4 with CFM=V2
+    Rc4,
+    /// AES-128-CBC — used by R4 with CFM=AESV2
+    Aes128,
+    /// AES-256-CBC — used by R5/R6 with CFM=AESV3
+    Aes256,
+}
+
+/// Everything needed to decrypt a PDF, regardless of revision.
+pub struct DecryptionKey {
+    pub file_key: Vec<u8>,
+    pub cipher_mode: CipherMode,
+}
+
 /// Encrypt a PDF document with AES-256 (R6).
 pub fn encrypt_pdf(doc: &mut Document, params: &EncryptParams) -> Result<()> {
     let file_key = generate_file_encryption_key();
@@ -56,9 +73,18 @@ pub fn encrypt_pdf(doc: &mut Document, params: &EncryptParams) -> Result<()> {
     Ok(())
 }
 
-/// Remove encryption from a PDF. Requires the file encryption key.
-pub fn decrypt_pdf(doc: &mut Document, file_key: &[u8; KEY_LEN]) -> Result<()> {
-    decrypt_objects(doc, file_key)?;
+/// Remove encryption from a PDF. Requires the decryption key.
+pub fn decrypt_pdf(doc: &mut Document, key: &DecryptionKey) -> Result<()> {
+    match key.cipher_mode {
+        CipherMode::Aes256 => {
+            let mut file_key_arr = [0u8; KEY_LEN];
+            file_key_arr.copy_from_slice(&key.file_key);
+            decrypt_objects(doc, &file_key_arr)?;
+        }
+        CipherMode::Aes128 | CipherMode::Rc4 => {
+            decrypt_objects_legacy(doc, &key.file_key, key.cipher_mode)?;
+        }
+    }
 
     let encrypt_id = crate::pdf::reader::get_encrypt_object_id(doc);
     doc.trailer.remove(b"Encrypt");
@@ -93,6 +119,85 @@ fn decrypt_objects(doc: &mut Document, file_key: &[u8; KEY_LEN]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Decrypt all objects using per-object keys (R3/R4).
+fn decrypt_objects_legacy(doc: &mut Document, file_key: &[u8], cipher_mode: CipherMode) -> Result<()> {
+    let ids: Vec<ObjectId> = doc.objects.keys().cloned().collect();
+    for id in ids {
+        if let Some(obj) = doc.objects.get(&id).cloned() {
+            let object_key = match cipher_mode {
+                CipherMode::Aes128 => encryption::compute_object_key_aes128(file_key, id.0, id.1),
+                CipherMode::Rc4 => encryption::compute_object_key_rc4(file_key, id.0, id.1),
+                CipherMode::Aes256 => unreachable!(),
+            };
+            doc.objects.insert(id, decrypt_object_legacy(obj, &object_key, cipher_mode)?);
+        }
+    }
+    Ok(())
+}
+
+/// Decrypt a single PDF object using a per-object key (R3/R4).
+fn decrypt_object_legacy(obj: Object, object_key: &[u8], cipher_mode: CipherMode) -> Result<Object> {
+    match obj {
+        Object::String(data, _) => {
+            if data.is_empty() {
+                return Ok(Object::String(data, StringFormat::Literal));
+            }
+            let decrypted = match cipher_mode {
+                CipherMode::Rc4 => encryption::rc4_transform(object_key, &data),
+                CipherMode::Aes128 => {
+                    if data.len() < 32 {
+                        // Too short for AES-128-CBC (need at least IV + 1 block)
+                        return Ok(Object::String(data, StringFormat::Literal));
+                    }
+                    match encryption::decrypt_stream_aes128(object_key, &data) {
+                        Ok(d) => d,
+                        Err(_) => data,
+                    }
+                }
+                CipherMode::Aes256 => unreachable!(),
+            };
+            Ok(Object::String(decrypted, StringFormat::Literal))
+        }
+        Object::Stream(mut stream) => {
+            if is_skip_type(&stream.dict) {
+                return Ok(Object::Stream(stream));
+            }
+            if stream.content.is_empty() {
+                return Ok(Object::Stream(stream));
+            }
+            match cipher_mode {
+                CipherMode::Rc4 => {
+                    stream.content = encryption::rc4_transform(object_key, &stream.content);
+                }
+                CipherMode::Aes128 => {
+                    if stream.content.len() >= 32 {
+                        if let Ok(decrypted) = encryption::decrypt_stream_aes128(object_key, &stream.content) {
+                            stream.content = decrypted;
+                        }
+                    }
+                }
+                CipherMode::Aes256 => unreachable!(),
+            }
+            stream.dict.set("Length", Object::Integer(stream.content.len() as i64));
+            Ok(Object::Stream(stream))
+        }
+        Object::Array(arr) => {
+            let new: Result<Vec<_>> = arr.into_iter()
+                .map(|o| decrypt_object_legacy(o, object_key, cipher_mode))
+                .collect();
+            Ok(Object::Array(new?))
+        }
+        Object::Dictionary(dict) => {
+            let mut new = lopdf::Dictionary::new();
+            for (key, val) in dict.into_iter() {
+                new.set(key, decrypt_object_legacy(val, object_key, cipher_mode)?);
+            }
+            Ok(Object::Dictionary(new))
+        }
+        other => Ok(other),
+    }
 }
 
 fn encrypt_object(obj: Object, file_key: &[u8; KEY_LEN]) -> Result<Object> {

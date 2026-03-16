@@ -117,14 +117,14 @@ echo "$PDF_PASS" | pdfk unlock file.pdf --password-stdin
 op read "op://vault/pdf-password" | pdfk unlock file.pdf --password-stdin
 ```
 
-## Encryption
+### Supported
 
-pdfk uses **AES-256 (Revision 6)** encryption by default — the strongest encryption defined in the PDF 2.0 specification.
-
-Decryption supports:
-- AES-256 R6 (PDF 2.0)
-- AES-256 R5 (Adobe Extension Level 3)
-
-Legacy encryption formats (RC4, AES-128) are planned for future versions.
+| Revision | Cipher  | Key Size | PDF Spec                  | Encrypt | Decrypt |
+|----------|---------|----------|---------------------------|---------|---------|
+| R6       | AES-256 | 256-bit  | PDF 2.0                   | ✅       | ✅       |
+| R5       | AES-256 | 256-bit  | Adobe Extension Level 3   | —       | ✅       |
+| R4       | AES-128 | 128-bit  | PDF 1.5–1.7               | —       | ✅       |
+| R4       | RC4     | 128-bit  | PDF 1.5–1.7               | —       | ✅       |
+| R3       | RC4     | 128-bit  | PDF 1.4                   | —       | ✅       |
 
 ### [MIT](./LICENSE) License

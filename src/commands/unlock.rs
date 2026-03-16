@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core::encryption;
 use crate::pdf::reader;
-use crate::pdf::writer;
+use crate::pdf::writer::{self, CipherMode, DecryptionKey};
 use crate::utils::{display_path, print_success, resolve_password};
 
 pub fn execute(
@@ -25,9 +25,9 @@ pub fn execute(
 
     let pass = resolve_password(password, password_stdin)?;
     let enc_info = reader::parse_encryption_dict(&doc)?;
-    let file_key = try_recover_key(&enc_info, pass.as_bytes())?;
+    let dec_key = try_recover_key(&enc_info, pass.as_bytes())?;
 
-    writer::decrypt_pdf(&mut doc, &file_key)?;
+    writer::decrypt_pdf(&mut doc, &dec_key)?;
 
     let output_path = resolve_output_path(&file, output, in_place)?;
     writer::save_pdf(&mut doc, &output_path)?;
@@ -44,27 +44,60 @@ pub fn execute(
 fn try_recover_key(
     enc_info: &reader::EncryptionInfo,
     password: &[u8],
-) -> Result<[u8; encryption::KEY_LEN]> {
+) -> Result<DecryptionKey> {
     match enc_info.revision {
         6 => {
             if let Some(key) = encryption::verify_user_password_r6(password, &enc_info.u_value, &enc_info.ue_value) {
-                return Ok(key);
+                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
             }
             if let Some(key) = encryption::verify_owner_password_r6(password, &enc_info.o_value, &enc_info.oe_value, &enc_info.u_value) {
-                return Ok(key);
+                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
             }
             bail!("Wrong password")
         }
         5 => {
             if let Some(key) = encryption::verify_user_password_r5(password, &enc_info.u_value, &enc_info.ue_value) {
-                return Ok(key);
+                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
             }
             if let Some(key) = encryption::verify_owner_password_r5(password, &enc_info.o_value, &enc_info.oe_value, &enc_info.u_value) {
-                return Ok(key);
+                return Ok(DecryptionKey { file_key: key.to_vec(), cipher_mode: CipherMode::Aes256 });
             }
             bail!("Wrong password")
         }
-        r => bail!("Unsupported encryption revision: R{r}. pdfk v0.1 supports AES-256 (R5/R6) only."),
+        3 | 4 => {
+            let key_length_bytes = (enc_info.key_length / 8) as usize;
+            let cipher_mode = cipher_mode_for_legacy(enc_info);
+
+            if let Some(key) = encryption::verify_user_password_legacy(
+                password, &enc_info.u_value, &enc_info.o_value,
+                enc_info.p_value, &enc_info.file_id, key_length_bytes,
+                enc_info.revision, enc_info.encrypt_metadata,
+            ) {
+                return Ok(DecryptionKey { file_key: key, cipher_mode });
+            }
+            if let Some(key) = encryption::verify_owner_password_legacy(
+                password, &enc_info.u_value, &enc_info.o_value,
+                enc_info.p_value, &enc_info.file_id, key_length_bytes,
+                enc_info.revision, enc_info.encrypt_metadata,
+            ) {
+                return Ok(DecryptionKey { file_key: key, cipher_mode });
+            }
+            bail!("Wrong password")
+        }
+        r => bail!("Unsupported encryption revision: R{r}"),
+    }
+}
+
+/// Determine the cipher mode for R3/R4 from the encryption info.
+fn cipher_mode_for_legacy(enc_info: &reader::EncryptionInfo) -> CipherMode {
+    if enc_info.revision == 4 {
+        match enc_info.stm_cfm.as_deref() {
+            Some("AESV2") => CipherMode::Aes128,
+            _ => CipherMode::Rc4,
+        }
+    } else {
+        // R3 is always RC4
+        CipherMode::Rc4
     }
 }
 
