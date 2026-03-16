@@ -82,11 +82,16 @@ fn encrypt_object(obj: Object, file_key: &[u8; KEY_LEN]) -> Result<Object> {
             if is_skip_type(&stream.dict) {
                 return Ok(Object::Stream(stream));
             }
-            let _ = stream.decompress();
+            // Encrypt stream content as-is, preserving filters.
+            // Per the PDF spec, encryption sits below the filter chain:
+            //   write: data → filter (compress) → encrypt → file
+            //   read:  file → decrypt → filter (decompress) → data
+            // Decompressing before encryption would break filters that lopdf
+            // cannot reverse (e.g. DCTDecode for JPEG images) and also bloats
+            // the output by discarding compression.
             let encrypted = encryption::encrypt_stream_aes256(file_key, &stream.content);
             stream.content = encrypted;
             stream.dict.set("Length", Object::Integer(stream.content.len() as i64));
-            stream.dict.remove(b"Filter");
             Ok(Object::Stream(stream))
         }
         Object::Array(arr) => {

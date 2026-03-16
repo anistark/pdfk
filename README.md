@@ -1,16 +1,32 @@
-# `pdfk` - PDF Kit
+# `pdfk` — PDF Kit
 
 [![Crates.io Version](https://img.shields.io/crates/v/pdfk)](https://crates.io/crates/pdfk) [![Crates.io Downloads](https://img.shields.io/crates/d/pdfk)](https://crates.io/crates/pdfk) [![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/pdfk)](https://crates.io/crates/pdfk) [![Open Source](https://img.shields.io/badge/open-source-brightgreen)](https://github.com/anistark/pdfk) ![maintenance-status](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Modern PDF CLI tool. 
-Fast, offline, secure.
+A modern CLI for PDF password management.
+Fast, offline, and secure — your files never leave your machine.
+
+## Why pdfk?
+
+- **Fully offline** — zero network calls, no telemetry, no file uploads
+- **AES-256 encryption** — uses the strongest PDF encryption standard (PDF 2.0, R6)
+- **Single binary** — no runtime dependencies, no Python/Java/Node required
+- **Script-friendly** — stdin password input, exit codes, quiet operation for CI/CD pipelines
+- **Preserves fidelity** — images, fonts, and all PDF content survive lock/unlock roundtrips intact
 
 ## Install
+
+### From crates.io
+
+```sh
+cargo install pdfk
+```
 
 ### From source
 
 ```sh
-cargo install pdfk
+git clone https://github.com/anistark/pdfk.git
+cd pdfk
+cargo install --path .
 ```
 
 ### Homebrew (coming soon)
@@ -19,23 +35,24 @@ cargo install pdfk
 brew install pdfk
 ```
 
-## Usage
+## Commands
 
-### Lock — Encrypt a PDF
+### `lock` — Encrypt a PDF
 
 ```sh
 pdfk lock document.pdf --password mypassword
 ```
 
-This creates `document_locked.pdf` with AES-256 encryption.
-
-**Options:**
+Creates `document_locked.pdf` with AES-256 encryption.
 
 ```sh
+# Interactive password prompt (hidden input, nothing in shell history)
+pdfk lock document.pdf --password
+
 # Write to a specific file
 pdfk lock document.pdf --password mypassword --output encrypted.pdf
 
-# Modify in place
+# Modify in place (overwrites the original)
 pdfk lock document.pdf --password mypassword --in-place
 
 # Set separate user and owner passwords
@@ -44,19 +61,22 @@ pdfk lock document.pdf --user-password viewpass --owner-password adminpass
 # Restrict permissions
 pdfk lock document.pdf --password mypassword --no-print --no-copy --no-edit
 
-# Read password from stdin (avoids shell history)
+# Read password from stdin (for scripts and CI)
 echo "mypassword" | pdfk lock document.pdf --password-stdin
 ```
 
-### Unlock — Decrypt a PDF
+### `unlock` — Decrypt a PDF
 
 ```sh
 pdfk unlock encrypted.pdf --password mypassword
 ```
 
-Creates `encrypted_unlocked.pdf` with encryption removed.
+Creates `encrypted_unlocked.pdf` with all encryption removed.
 
 ```sh
+# Interactive prompt
+pdfk unlock encrypted.pdf --password
+
 # Write to a specific file
 pdfk unlock encrypted.pdf --password mypassword --output decrypted.pdf
 
@@ -67,24 +87,27 @@ pdfk unlock encrypted.pdf --password mypassword --in-place
 echo "mypassword" | pdfk unlock encrypted.pdf --password-stdin
 ```
 
-### Change Password
+### `change-password` — Change the password
 
 ```sh
 pdfk change-password encrypted.pdf --old oldpass --new newpass
 ```
 
 ```sh
+# Interactive prompts for both passwords
+pdfk change-password encrypted.pdf --old --new
+
 # Passwords from stdin (one per line: old, then new)
 printf "oldpass\nnewpass" | pdfk change-password encrypted.pdf --password-stdin
 ```
 
-### Check — Verify a Password
+### `check` — Verify a password
 
 ```sh
 pdfk check encrypted.pdf --password mypassword
 ```
 
-Exits with code `0` if the password is correct, non-zero otherwise. Useful in scripts:
+Exits `0` if the password is correct, non-zero otherwise. Useful in scripts:
 
 ```sh
 if pdfk check file.pdf --password "$PASS" 2>/dev/null; then
@@ -92,39 +115,123 @@ if pdfk check file.pdf --password "$PASS" 2>/dev/null; then
 fi
 ```
 
+## Use Cases
+
+### Protect sensitive documents before sharing
+
+Lock a contract, invoice, or report before emailing it or uploading to a shared drive:
+
+```sh
+pdfk lock contract.pdf --password clientSecret123 --output contract_protected.pdf
+```
+
+### Restrict what recipients can do
+
+Allow viewing but prevent printing or copying text (e.g., exam papers, proprietary reports):
+
+```sh
+pdfk lock exam.pdf --password teacherpass --no-print --no-copy
+```
+
+### Batch-encrypt files in a CI/CD pipeline
+
+Automate PDF protection in build pipelines, document generation workflows, or release processes:
+
+```sh
+for pdf in reports/*.pdf; do
+    echo "$SECRET" | pdfk lock "$pdf" --password-stdin --in-place
+done
+```
+
+### Remove encryption for downstream processing
+
+Unlock PDFs to feed into other tools (OCR, merge, split, text extraction):
+
+```sh
+pdfk unlock scanned.pdf --password mypass --output scanned_open.pdf
+# now pass to your OCR / merge / split tool
+```
+
+### Rotate passwords on archived documents
+
+Change passwords periodically on encrypted archives without decrypting to disk:
+
+```sh
+printf "oldpass\nnewpass" | pdfk change-password archive.pdf --password-stdin --in-place
+```
+
+### Verify passwords in scripts before proceeding
+
+Gate a workflow on password correctness without modifying the file:
+
+```sh
+if ! pdfk check file.pdf --password "$PASS" 2>/dev/null; then
+    echo "Wrong password, aborting" >&2
+    exit 1
+fi
+```
+
+### Integrate with password managers
+
+Pipe secrets directly from your vault — nothing touches the shell history:
+
+```sh
+# 1Password
+op read "op://vault/pdf-password" | pdfk lock report.pdf --password-stdin
+
+# Bitwarden
+bw get password pdf-secret | pdfk unlock report.pdf --password-stdin
+
+# macOS Keychain
+security find-generic-password -s "pdf-pass" -w | pdfk lock doc.pdf --password-stdin
+```
+
 ## Password Types
 
-PDF supports two password types:
+PDF supports two password levels:
 
-- **User password** — required to open and view the document
-- **Owner password** — controls what actions are allowed (print, copy, edit)
+| Password | Purpose |
+|---|---|
+| **User password** | Required to open and view the document |
+| **Owner password** | Controls permissions (print, copy, edit) — viewer apps enforce these |
 
 Use `--password` to set both to the same value, or set them independently:
 
 ```sh
-pdfk lock file.pdf --user-password viewonly --owner-password fullaccess
+# Anyone with "reader" can view; only "admin" can change permissions
+pdfk lock file.pdf --user-password reader --owner-password admin
 ```
 
 ## Secure Password Input
 
-Avoid exposing passwords in shell history:
+Three ways to provide passwords, from most to least secure:
 
-```sh
-# Pipe from stdin
-echo "$PDF_PASS" | pdfk unlock file.pdf --password-stdin
+| Method | Shell history | Visible in `ps` | Works in scripts |
+|---|---|---|---|
+| `--password` (bare, no value) | ✗ | ✗ | ✗ (needs TTY) |
+| `--password-stdin` | ✗ | ✗ | ✓ |
+| `--password mypass` | ✓ | ✓ | ✓ |
 
-# Pipe from a password manager
-op read "op://vault/pdf-password" | pdfk unlock file.pdf --password-stdin
-```
+For interactive use, prefer the bare `--password` flag. For automation, use `--password-stdin`.
 
-### Supported
+## Encryption Support
 
-| Revision | Cipher  | Key Size | PDF Spec                  | Encrypt | Decrypt |
-|----------|---------|----------|---------------------------|---------|---------|
-| R6       | AES-256 | 256-bit  | PDF 2.0                   | ✅       | ✅       |
-| R5       | AES-256 | 256-bit  | Adobe Extension Level 3   | —       | ✅       |
-| R4       | AES-128 | 128-bit  | PDF 1.5–1.7               | —       | ✅       |
-| R4       | RC4     | 128-bit  | PDF 1.5–1.7               | —       | ✅       |
-| R3       | RC4     | 128-bit  | PDF 1.4                   | —       | ✅       |
+pdfk encrypts using the strongest available standard and can decrypt all common PDF encryption formats:
 
-### [MIT](./LICENSE) License
+| Revision | Cipher  | Key Size | PDF Spec                | Encrypt | Decrypt |
+|----------|---------|----------|-------------------------|---------|---------|
+| R6       | AES-256 | 256-bit  | PDF 2.0                 | ✅       | ✅       |
+| R5       | AES-256 | 256-bit  | Adobe Extension Level 3 | —       | ✅       |
+| R4       | AES-128 | 128-bit  | PDF 1.5–1.7             | —       | ✅       |
+| R4       | RC4     | 128-bit  | PDF 1.5–1.7             | —       | ✅       |
+| R3       | RC4     | 128-bit  | PDF 1.4                 | —       | ✅       |
+
+All encryption is performed locally. No data is ever sent over the network.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture, and guidelines.
+
+## License
+
+[MIT](./LICENSE)

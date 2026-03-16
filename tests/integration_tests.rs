@@ -580,7 +580,7 @@ fn test_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("pdfk 0.1.1"));
+        .stdout(predicate::str::contains("pdfk 0.1.2"));
 }
 
 #[test]

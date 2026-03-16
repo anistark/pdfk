@@ -1,3 +1,5 @@
+set positional-arguments
+
 default:
     @just --list
 
@@ -31,11 +33,11 @@ test:
 
 # Run with arguments (e.g. just run lock file.pdf --password test)
 run *ARGS:
-    cargo run -- {{ ARGS }}
+    cargo run -- "$@"
 
 # Build and run in one step
 dev *ARGS:
-    cargo run -- {{ ARGS }}
+    cargo run -- "$@"
 
 # Test Publish to crates.io (dry run)
 publish-test:

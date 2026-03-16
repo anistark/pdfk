@@ -21,7 +21,7 @@ pub enum Command {
         file: PathBuf,
 
         /// Password (sets both user & owner password; prompts if omitted)
-        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
+        #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin
@@ -29,11 +29,11 @@ pub enum Command {
         password_stdin: bool,
 
         /// User password (required to open/view)
-        #[arg(long)]
+        #[arg(short = 'u', long)]
         user_password: Option<String>,
 
         /// Owner password (controls permissions)
-        #[arg(long)]
+        #[arg(short = 'O', long)]
         owner_password: Option<String>,
 
         /// Disable printing
@@ -49,7 +49,7 @@ pub enum Command {
         no_edit: bool,
 
         /// Output file path
-        #[arg(long, group = "output_mode")]
+        #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
         /// Modify the file in place
@@ -63,7 +63,7 @@ pub enum Command {
         file: PathBuf,
 
         /// Password (prompts interactively if value is omitted)
-        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
+        #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin
@@ -71,7 +71,7 @@ pub enum Command {
         password_stdin: bool,
 
         /// Output file path
-        #[arg(long, group = "output_mode")]
+        #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
         /// Modify the file in place
@@ -97,7 +97,7 @@ pub enum Command {
         password_stdin: bool,
 
         /// Output file path
-        #[arg(long, group = "output_mode")]
+        #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
         /// Modify the file in place
@@ -111,7 +111,7 @@ pub enum Command {
         file: PathBuf,
 
         /// Password to verify (prompts interactively if value is omitted)
-        #[arg(long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
+        #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
         /// Read password from stdin
