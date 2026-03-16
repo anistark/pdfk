@@ -32,7 +32,9 @@ just test          # Run all tests
 just run <args>    # Run the CLI (e.g. just run lock file.pdf --password test)
 just dev <args>    # Build and run in one step
 just publish-test  # Dry-run publish to crates.io
-just publish       # Publish to crates.io
+just tag-release   # Create git tag for current version
+just gh-release    # Create GitHub release with binary
+just publish       # Publish to crates.io + GitHub release
 just clean         # Clean build artifacts
 ```
 
