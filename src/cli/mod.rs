@@ -17,8 +17,9 @@ pub struct Cli {
 pub enum Command {
     /// Encrypt a PDF with a password
     Lock {
-        /// Input PDF file
-        file: PathBuf,
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
 
         /// Password (sets both user & owner password; prompts if omitted)
         #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
@@ -48,19 +49,28 @@ pub enum Command {
         #[arg(long, default_value_t = false)]
         no_edit: bool,
 
-        /// Output file path
+        /// Output file path (only valid with a single input file)
         #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
-        /// Modify the file in place
+        /// Modify the file(s) in place
         #[arg(long, group = "output_mode")]
         in_place: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
+
+        /// Show what would happen without modifying files
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Decrypt a PDF by removing password protection
     Unlock {
-        /// Input PDF file
-        file: PathBuf,
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
 
         /// Password (prompts interactively if value is omitted)
         #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
@@ -70,19 +80,28 @@ pub enum Command {
         #[arg(long, group = "password_source")]
         password_stdin: bool,
 
-        /// Output file path
+        /// Output file path (only valid with a single input file)
         #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
-        /// Modify the file in place
+        /// Modify the file(s) in place
         #[arg(long, group = "output_mode")]
         in_place: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
+
+        /// Show what would happen without modifying files
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Change the password on an encrypted PDF
     ChangePassword {
-        /// Input PDF file
-        file: PathBuf,
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
 
         /// Current password (prompts interactively if value is omitted)
         #[arg(long, num_args = 0..=1, default_missing_value = "")]
@@ -96,29 +115,43 @@ pub enum Command {
         #[arg(long)]
         password_stdin: bool,
 
-        /// Output file path
+        /// Output file path (only valid with a single input file)
         #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
 
-        /// Modify the file in place
+        /// Modify the file(s) in place
         #[arg(long, group = "output_mode")]
         in_place: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
+
+        /// Show what would happen without modifying files
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Display encryption details for a PDF
     Info {
-        /// Input PDF file
-        file: PathBuf,
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
 
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
     },
 
     /// Verify a password works without modifying the file
     Check {
-        /// Input PDF file
-        file: PathBuf,
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
 
         /// Password to verify (prompts interactively if value is omitted)
         #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
@@ -127,6 +160,10 @@ pub enum Command {
         /// Read password from stdin
         #[arg(long, group = "password_source")]
         password_stdin: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
     },
 }
 

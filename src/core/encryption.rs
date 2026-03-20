@@ -25,10 +25,8 @@ pub const KEY_LEN: usize = 32;
 
 /// Standard PDF password padding string (Table 2 / Appendix A in PDF spec).
 pub const PASSWORD_PADDING: [u8; 32] = [
-    0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41,
-    0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
-    0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80,
-    0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
+    0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41, 0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
+    0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
 ];
 
 /// Pad or truncate a password to exactly 32 bytes using the PDF padding string.
@@ -89,11 +87,7 @@ fn compute_o_key(owner_password: &[u8], key_length_bytes: usize, revision: i64) 
 }
 
 /// Algorithm 4/5: Compute the U value for password verification.
-pub fn compute_u_value(
-    key: &[u8],
-    file_id: &[u8],
-    revision: i64,
-) -> Vec<u8> {
+pub fn compute_u_value(key: &[u8], file_id: &[u8], revision: i64) -> Vec<u8> {
     if revision == 2 {
         // Algorithm 4: RC4 encrypt the padding string
         rc4_transform(key, &PASSWORD_PADDING)
@@ -117,6 +111,7 @@ pub fn compute_u_value(
 }
 
 /// Verify a user password for R2/R3/R4. Returns the file encryption key on success.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_user_password_legacy(
     password: &[u8],
     u_value: &[u8],
@@ -128,7 +123,13 @@ pub fn verify_user_password_legacy(
     encrypt_metadata: bool,
 ) -> Option<Vec<u8>> {
     let key = compute_encryption_key(
-        password, o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        password,
+        o_value,
+        p_value,
+        file_id,
+        key_length_bytes,
+        revision,
+        encrypt_metadata,
     );
     let computed_u = compute_u_value(&key, file_id, revision);
 
@@ -150,6 +151,7 @@ pub fn verify_user_password_legacy(
 
 /// Verify an owner password for R2/R3/R4.
 /// Decrypts the O value to recover the user password, then verifies it.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_owner_password_legacy(
     password: &[u8],
     u_value: &[u8],
@@ -176,7 +178,14 @@ pub fn verify_owner_password_legacy(
 
     // Verify with the recovered user password
     verify_user_password_legacy(
-        &user_password, u_value, o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+        &user_password,
+        u_value,
+        o_value,
+        p_value,
+        file_id,
+        key_length_bytes,
+        revision,
+        encrypt_metadata,
     )
 }
 
@@ -259,8 +268,12 @@ pub fn decrypt_stream_aes128(key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
     // Strip PKCS#7 padding
     if let Some(&pad_byte) = decrypted.last() {
         let pad_len = pad_byte as usize;
-        if pad_len > 0 && pad_len <= 16 && pad_len <= decrypted.len()
-            && decrypted[decrypted.len() - pad_len..].iter().all(|&b| b == pad_byte)
+        if pad_len > 0
+            && pad_len <= 16
+            && pad_len <= decrypted.len()
+            && decrypted[decrypted.len() - pad_len..]
+                .iter()
+                .all(|&b| b == pad_byte)
         {
             return Ok(decrypted[..decrypted.len() - pad_len].to_vec());
         }
@@ -364,10 +377,7 @@ fn compute_hash_r5(password: &[u8], salt: &[u8], user_key: &[u8]) -> [u8; 32] {
 
 // --- Compute encryption dictionary values ---
 
-pub fn compute_u_ue_r6(
-    password: &[u8],
-    file_key: &[u8; KEY_LEN],
-) -> ([u8; 48], [u8; 32]) {
+pub fn compute_u_ue_r6(password: &[u8], file_key: &[u8; KEY_LEN]) -> ([u8; 48], [u8; 32]) {
     let validation_salt = random_bytes(8);
     let key_salt = random_bytes(8);
 
@@ -409,7 +419,11 @@ pub fn compute_o_oe_r6(
     (o, oe_arr)
 }
 
-pub fn compute_perms_r6(file_key: &[u8; KEY_LEN], p_value: i32, encrypt_metadata: bool) -> [u8; 16] {
+pub fn compute_perms_r6(
+    file_key: &[u8; KEY_LEN],
+    p_value: i32,
+    encrypt_metadata: bool,
+) -> [u8; 16] {
     let p_bytes = (p_value as u32).to_le_bytes();
     let mut block = [0u8; 16];
     block[..4].copy_from_slice(&p_bytes);
@@ -736,7 +750,13 @@ mod tests {
 
         // Compute encryption key
         let key = compute_encryption_key(
-            password, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+            password,
+            &o_value,
+            p_value,
+            file_id,
+            key_length_bytes,
+            revision,
+            encrypt_metadata,
         );
         assert_eq!(key.len(), key_length_bytes);
 
@@ -746,14 +766,28 @@ mod tests {
 
         // Verify user password
         let recovered = verify_user_password_legacy(
-            password, &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+            password,
+            &u_value,
+            &o_value,
+            p_value,
+            file_id,
+            key_length_bytes,
+            revision,
+            encrypt_metadata,
         );
         assert!(recovered.is_some());
         assert_eq!(recovered.unwrap(), key);
 
         // Wrong password should fail
         let wrong = verify_user_password_legacy(
-            b"wrongpass", &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+            b"wrongpass",
+            &u_value,
+            &o_value,
+            p_value,
+            file_id,
+            key_length_bytes,
+            revision,
+            encrypt_metadata,
         );
         assert!(wrong.is_none());
     }
@@ -779,13 +813,26 @@ mod tests {
 
         // Compute encryption key from user password
         let key = compute_encryption_key(
-            user_password, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+            user_password,
+            &o_value,
+            p_value,
+            file_id,
+            key_length_bytes,
+            revision,
+            encrypt_metadata,
         );
         let u_value = compute_u_value(&key, file_id, revision);
 
         // Verify owner password recovers the same key
         let recovered = verify_owner_password_legacy(
-            owner_password, &u_value, &o_value, p_value, file_id, key_length_bytes, revision, encrypt_metadata,
+            owner_password,
+            &u_value,
+            &o_value,
+            p_value,
+            file_id,
+            key_length_bytes,
+            revision,
+            encrypt_metadata,
         );
         assert!(recovered.is_some());
         assert_eq!(recovered.unwrap(), key);
@@ -793,8 +840,10 @@ mod tests {
 
     #[test]
     fn test_per_object_key_rc4() {
-        let file_key = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                           0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10];
+        let file_key = vec![
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+            0x0F, 0x10,
+        ];
         let key1 = compute_object_key_rc4(&file_key, 1, 0);
         let key2 = compute_object_key_rc4(&file_key, 2, 0);
         // Different objects should produce different keys
@@ -805,8 +854,10 @@ mod tests {
 
     #[test]
     fn test_per_object_key_aes128() {
-        let file_key = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                           0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10];
+        let file_key = vec![
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+            0x0F, 0x10,
+        ];
         let key_rc4 = compute_object_key_rc4(&file_key, 1, 0);
         let key_aes = compute_object_key_aes128(&file_key, 1, 0);
         // AES key includes "sAlT" so should differ from RC4 key

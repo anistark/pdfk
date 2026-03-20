@@ -1,16 +1,16 @@
-pub mod lock;
-pub mod unlock;
 pub mod change_password;
 pub mod check;
 pub mod info;
+pub mod lock;
+pub mod unlock;
 
-use anyhow::Result;
 use crate::cli::{Cli, Command};
+use anyhow::Result;
 
 pub fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Lock {
-            file,
+            files,
             password,
             password_stdin,
             user_password,
@@ -20,8 +20,10 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             no_edit,
             output,
             in_place,
+            recursive,
+            dry_run,
         } => lock::execute(
-            file,
+            files,
             password,
             password_stdin,
             user_password,
@@ -31,30 +33,55 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             no_edit,
             output,
             in_place,
+            recursive,
+            dry_run,
         ),
         Command::Unlock {
-            file,
+            files,
             password,
             password_stdin,
             output,
             in_place,
-        } => unlock::execute(file, password, password_stdin, output, in_place),
+            recursive,
+            dry_run,
+        } => unlock::execute(
+            files,
+            password,
+            password_stdin,
+            output,
+            in_place,
+            recursive,
+            dry_run,
+        ),
         Command::ChangePassword {
-            file,
+            files,
             old,
             new,
             password_stdin,
             output,
             in_place,
-        } => change_password::execute(file, old, new, password_stdin, output, in_place),
+            recursive,
+            dry_run,
+        } => change_password::execute(
+            files,
+            old,
+            new,
+            password_stdin,
+            output,
+            in_place,
+            recursive,
+            dry_run,
+        ),
         Command::Info {
-            file,
+            files,
             json,
-        } => info::execute(file, json),
+            recursive,
+        } => info::execute(files, json, recursive),
         Command::Check {
-            file,
+            files,
             password,
             password_stdin,
-        } => check::execute(file, password, password_stdin),
+            recursive,
+        } => check::execute(files, password, password_stdin, recursive),
     }
 }

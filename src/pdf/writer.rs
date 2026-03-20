@@ -3,8 +3,7 @@ use lopdf::{Document, Object, ObjectId, StringFormat};
 use std::path::Path;
 
 use crate::core::encryption::{
-    self, compute_o_oe_r6, compute_perms_r6, compute_u_ue_r6, generate_file_encryption_key,
-    KEY_LEN,
+    self, compute_o_oe_r6, compute_perms_r6, compute_u_ue_r6, generate_file_encryption_key, KEY_LEN,
 };
 use crate::core::permissions::PdfPermissions;
 
@@ -34,20 +33,33 @@ pub fn encrypt_pdf(doc: &mut Document, params: &EncryptParams) -> Result<()> {
         ("P", Object::Integer(p_value as i64)),
         ("U", Object::String(u_value.to_vec(), StringFormat::Literal)),
         ("O", Object::String(o_value.to_vec(), StringFormat::Literal)),
-        ("UE", Object::String(ue_value.to_vec(), StringFormat::Literal)),
-        ("OE", Object::String(oe_value.to_vec(), StringFormat::Literal)),
-        ("Perms", Object::String(perms_value.to_vec(), StringFormat::Literal)),
+        (
+            "UE",
+            Object::String(ue_value.to_vec(), StringFormat::Literal),
+        ),
+        (
+            "OE",
+            Object::String(oe_value.to_vec(), StringFormat::Literal),
+        ),
+        (
+            "Perms",
+            Object::String(perms_value.to_vec(), StringFormat::Literal),
+        ),
         ("EncryptMetadata", Object::Boolean(true)),
         ("StmF", Object::Name(b"StdCF".to_vec())),
         ("StrF", Object::Name(b"StdCF".to_vec())),
-        ("CF", Object::Dictionary(lopdf::Dictionary::from_iter(vec![
-            ("StdCF", Object::Dictionary(lopdf::Dictionary::from_iter(vec![
-                ("Type", Object::Name(b"CryptFilter".to_vec())),
-                ("CFM", Object::Name(b"AESV3".to_vec())),
-                ("AuthEvent", Object::Name(b"DocOpen".to_vec())),
-                ("Length", Object::Integer(32)),
-            ]))),
-        ]))),
+        (
+            "CF",
+            Object::Dictionary(lopdf::Dictionary::from_iter(vec![(
+                "StdCF",
+                Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                    ("Type", Object::Name(b"CryptFilter".to_vec())),
+                    ("CFM", Object::Name(b"AESV3".to_vec())),
+                    ("AuthEvent", Object::Name(b"DocOpen".to_vec())),
+                    ("Length", Object::Integer(32)),
+                ])),
+            )])),
+        ),
     ]);
 
     let encrypt_id = doc.add_object(Object::Dictionary(encrypt_dict));
@@ -91,11 +103,16 @@ fn encrypt_object(obj: Object, file_key: &[u8; KEY_LEN]) -> Result<Object> {
             // the output by discarding compression.
             let encrypted = encryption::encrypt_stream_aes256(file_key, &stream.content);
             stream.content = encrypted;
-            stream.dict.set("Length", Object::Integer(stream.content.len() as i64));
+            stream
+                .dict
+                .set("Length", Object::Integer(stream.content.len() as i64));
             Ok(Object::Stream(stream))
         }
         Object::Array(arr) => {
-            let new: Result<Vec<_>> = arr.into_iter().map(|o| encrypt_object(o, file_key)).collect();
+            let new: Result<Vec<_>> = arr
+                .into_iter()
+                .map(|o| encrypt_object(o, file_key))
+                .collect();
             Ok(Object::Array(new?))
         }
         Object::Dictionary(dict) => {

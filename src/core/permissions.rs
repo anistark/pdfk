@@ -25,13 +25,13 @@ impl PdfPermissions {
         let mut p: u32 = 0xFFFFF0C0; // bits 7-8 and 13-32 set
 
         if self.allow_print {
-            p |= 1 << 2;  // bit 3: print
+            p |= 1 << 2; // bit 3: print
             p |= 1 << 11; // bit 12: high-quality print
         }
         if self.allow_edit {
-            p |= 1 << 3;  // bit 4: modify
-            p |= 1 << 5;  // bit 6: annotations
-            p |= 1 << 8;  // bit 9: fill forms
+            p |= 1 << 3; // bit 4: modify
+            p |= 1 << 5; // bit 6: annotations
+            p |= 1 << 8; // bit 9: fill forms
             p |= 1 << 10; // bit 11: assemble
         }
         if self.allow_copy {

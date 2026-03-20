@@ -1,10 +1,11 @@
 use anyhow::{bail, Result};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
-use crate::utils::display_path;
+use crate::utils::batch::{self, BatchSummary};
+use crate::utils::{display_path, print_error};
 
 #[derive(Serialize)]
 struct InfoOutput {
@@ -29,28 +30,87 @@ struct PermissionsOutput {
     edit: bool,
 }
 
-pub fn execute(file: PathBuf, json: bool) -> Result<()> {
-    if !file.exists() {
-        bail!("File not found: {}", display_path(&file));
+pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
+    let resolved = batch::resolve_files(&files, recursive)?;
+
+    let is_batch = resolved.len() > 1;
+    let pb = batch::create_progress_bar(resolved.len());
+    let mut summary = BatchSummary::default();
+    let mut json_outputs: Vec<InfoOutput> = Vec::new();
+
+    for file in &resolved {
+        if let Some(ref pb) = pb {
+            pb.set_message(display_path(file));
+        }
+
+        match info_single(file, json, is_batch, &mut json_outputs) {
+            Ok(()) => summary.succeeded += 1,
+            Err(e) => {
+                print_error(&format!("{}: {}", display_path(file), e));
+                summary.failed += 1;
+            }
+        }
+
+        if let Some(ref pb) = pb {
+            pb.inc(1);
+        }
     }
 
-    let doc = reader::load_pdf(&file)?;
+    if let Some(pb) = pb {
+        pb.finish_and_clear();
+    }
+
+    // For JSON batch output, print as array
+    if json && is_batch {
+        println!("{}", serde_json::to_string_pretty(&json_outputs)?);
+    }
+
+    if is_batch {
+        summary.print();
+    }
+
+    if summary.has_failures() {
+        bail!("{} file(s) failed", summary.failed);
+    }
+
+    Ok(())
+}
+
+fn info_single(
+    file: &Path,
+    json: bool,
+    is_batch: bool,
+    json_outputs: &mut Vec<InfoOutput>,
+) -> Result<()> {
+    if !file.exists() {
+        bail!("File not found: {}", display_path(file));
+    }
+
+    let doc = reader::load_pdf(file)?;
     let encrypted = reader::is_encrypted(&doc);
 
     if !encrypted {
+        let output = InfoOutput {
+            file: display_path(file),
+            encrypted: false,
+            algorithm: None,
+            key_length: None,
+            revision: None,
+            crypt_filter: None,
+            permissions: None,
+        };
+
         if json {
-            let output = InfoOutput {
-                file: display_path(&file),
-                encrypted: false,
-                algorithm: None,
-                key_length: None,
-                revision: None,
-                crypt_filter: None,
-                permissions: None,
-            };
-            println!("{}", serde_json::to_string_pretty(&output)?);
+            if is_batch {
+                json_outputs.push(output);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            }
         } else {
-            println!("File:      {}", display_path(&file));
+            if is_batch {
+                println!();
+            }
+            println!("File:      {}", display_path(file));
             println!("Encrypted: no");
         }
         return Ok(());
@@ -60,23 +120,31 @@ pub fn execute(file: PathBuf, json: bool) -> Result<()> {
     let perms = PdfPermissions::from_p_value(enc.p_value);
     let algorithm = resolve_algorithm(enc.revision, &enc.stm_cfm);
 
+    let output = InfoOutput {
+        file: display_path(file),
+        encrypted: true,
+        algorithm: Some(algorithm.clone()),
+        key_length: Some(enc.key_length),
+        revision: Some(format!("R{}", enc.revision)),
+        crypt_filter: enc.stm_cfm.clone(),
+        permissions: Some(PermissionsOutput {
+            print: perms.allow_print,
+            copy: perms.allow_copy,
+            edit: perms.allow_edit,
+        }),
+    };
+
     if json {
-        let output = InfoOutput {
-            file: display_path(&file),
-            encrypted: true,
-            algorithm: Some(algorithm),
-            key_length: Some(enc.key_length),
-            revision: Some(format!("R{}", enc.revision)),
-            crypt_filter: enc.stm_cfm.clone(),
-            permissions: Some(PermissionsOutput {
-                print: perms.allow_print,
-                copy: perms.allow_copy,
-                edit: perms.allow_edit,
-            }),
-        };
-        println!("{}", serde_json::to_string_pretty(&output)?);
+        if is_batch {
+            json_outputs.push(output);
+        } else {
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
     } else {
-        println!("File:         {}", display_path(&file));
+        if is_batch {
+            println!();
+        }
+        println!("File:         {}", display_path(file));
         println!("Encrypted:    yes");
         println!("Algorithm:    {algorithm}");
         println!("Key length:   {} bits", enc.key_length);
@@ -85,9 +153,30 @@ pub fn execute(file: PathBuf, json: bool) -> Result<()> {
             println!("Crypt filter: {cfm}");
         }
         println!("Permissions:");
-        println!("  Print: {}", if perms.allow_print { "allowed" } else { "denied" });
-        println!("  Copy:  {}", if perms.allow_copy { "allowed" } else { "denied" });
-        println!("  Edit:  {}", if perms.allow_edit { "allowed" } else { "denied" });
+        println!(
+            "  Print: {}",
+            if perms.allow_print {
+                "allowed"
+            } else {
+                "denied"
+            }
+        );
+        println!(
+            "  Copy:  {}",
+            if perms.allow_copy {
+                "allowed"
+            } else {
+                "denied"
+            }
+        );
+        println!(
+            "  Edit:  {}",
+            if perms.allow_edit {
+                "allowed"
+            } else {
+                "denied"
+            }
+        );
     }
 
     Ok(())

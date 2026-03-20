@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::pdf::writer::{self, EncryptParams};
-use crate::utils::{display_path, print_success, resolve_password};
+use crate::utils::batch::{self, BatchSummary};
+use crate::utils::{display_path, print_error, print_success, resolve_password};
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute(
-    file: PathBuf,
+    files: Vec<PathBuf>,
     password: Option<String>,
     password_stdin: bool,
     user_password: Option<String>,
@@ -18,20 +19,17 @@ pub fn execute(
     no_edit: bool,
     output: Option<PathBuf>,
     in_place: bool,
+    recursive: bool,
+    dry_run: bool,
 ) -> Result<()> {
-    if !file.exists() {
-        bail!("File not found: {}", display_path(&file));
+    let resolved = batch::resolve_files(&files, recursive)?;
+
+    // --output is only valid with a single file
+    if output.is_some() && resolved.len() > 1 {
+        bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    let mut doc = reader::load_pdf(&file)?;
-
-    if reader::is_encrypted(&doc) {
-        bail!(
-            "File is already encrypted: {}\nUse `pdfk change-password` to change the password.",
-            display_path(&file)
-        );
-    }
-
+    // Resolve passwords once before processing
     let (user_pass, owner_pass) = if user_password.is_some() || owner_password.is_some() {
         let up = user_password.unwrap_or_default();
         let op = owner_password.unwrap_or_else(|| up.clone());
@@ -51,20 +49,89 @@ pub fn execute(
         allow_edit: !no_edit,
     };
 
+    let is_batch = resolved.len() > 1;
+    let pb = batch::create_progress_bar(resolved.len());
+    let mut summary = BatchSummary::default();
+
+    for file in &resolved {
+        if let Some(ref pb) = pb {
+            pb.set_message(display_path(file));
+        }
+
+        if dry_run {
+            let output_path = resolve_output_path(file, output.clone(), in_place, "_locked")
+                .unwrap_or_else(|_| file.clone());
+            eprintln!(
+                "[dry-run] Would encrypt {} → {}",
+                display_path(file),
+                display_path(&output_path)
+            );
+            summary.succeeded += 1;
+        } else {
+            match lock_single(
+                file,
+                &user_pass,
+                &owner_pass,
+                &permissions,
+                output.clone(),
+                in_place,
+            ) {
+                Ok(()) => summary.succeeded += 1,
+                Err(e) => {
+                    print_error(&format!("{}: {}", display_path(file), e));
+                    summary.failed += 1;
+                }
+            }
+        }
+
+        if let Some(ref pb) = pb {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = pb {
+        pb.finish_and_clear();
+    }
+
+    if is_batch {
+        summary.print();
+    }
+
+    if summary.has_failures() {
+        bail!("{} file(s) failed", summary.failed);
+    }
+
+    Ok(())
+}
+
+fn lock_single(
+    file: &Path,
+    user_pass: &str,
+    owner_pass: &str,
+    permissions: &PdfPermissions,
+    output: Option<PathBuf>,
+    in_place: bool,
+) -> Result<()> {
+    let mut doc = reader::load_pdf(file)?;
+
+    if reader::is_encrypted(&doc) {
+        bail!("File is already encrypted. Use `pdfk change-password` to change the password.");
+    }
+
     let params = EncryptParams {
-        user_password: user_pass.into_bytes(),
-        owner_password: owner_pass.into_bytes(),
-        permissions,
+        user_password: user_pass.as_bytes().to_vec(),
+        owner_password: owner_pass.as_bytes().to_vec(),
+        permissions: *permissions,
     };
 
     writer::encrypt_pdf(&mut doc, &params)?;
 
-    let output_path = resolve_output_path(&file, output, in_place, "_locked")?;
+    let output_path = resolve_output_path(file, output, in_place, "_locked")?;
     writer::save_pdf(&mut doc, &output_path)?;
 
     print_success(&format!(
         "Encrypted {} → {}",
-        display_path(&file),
+        display_path(file),
         display_path(&output_path)
     ));
 
@@ -84,11 +151,16 @@ fn resolve_output_path(
         return Ok(input.to_path_buf());
     }
 
-    let stem = input.file_stem()
+    let stem = input
+        .file_stem()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "output".to_string());
-    let ext = input.extension()
+    let ext = input
+        .extension()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "pdf".to_string());
-    Ok(input.parent().unwrap_or(input).join(format!("{stem}{suffix}.{ext}")))
+    Ok(input
+        .parent()
+        .unwrap_or(input)
+        .join(format!("{stem}{suffix}.{ext}")))
 }

@@ -4,52 +4,107 @@ use std::path::{Path, PathBuf};
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::pdf::writer::{self, EncryptParams};
-use crate::utils::{display_path, password, print_success};
+use crate::utils::batch::{self, BatchSummary};
+use crate::utils::{display_path, password, print_error, print_success};
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute(
-    file: PathBuf,
+    files: Vec<PathBuf>,
     old: Option<String>,
     new: Option<String>,
     password_stdin: bool,
     output: Option<PathBuf>,
     in_place: bool,
+    recursive: bool,
+    dry_run: bool,
 ) -> Result<()> {
-    if !file.exists() {
-        bail!("File not found: {}", display_path(&file));
+    let resolved = batch::resolve_files(&files, recursive)?;
+
+    if output.is_some() && resolved.len() > 1 {
+        bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    // Load without password first to check encryption and read permissions.
-    let doc = reader::load_pdf(&file)?;
+    let (old_pass, new_pass) = password::resolve_old_new_passwords(old, new, password_stdin)?;
+
+    let is_batch = resolved.len() > 1;
+    let pb = batch::create_progress_bar(resolved.len());
+    let mut summary = BatchSummary::default();
+
+    for file in &resolved {
+        if let Some(ref pb) = pb {
+            pb.set_message(display_path(file));
+        }
+
+        if dry_run {
+            let output_path = resolve_output_path(file, output.clone(), in_place)
+                .unwrap_or_else(|_| file.clone());
+            eprintln!(
+                "[dry-run] Would change password: {} → {}",
+                display_path(file),
+                display_path(&output_path)
+            );
+            summary.succeeded += 1;
+        } else {
+            match change_password_single(file, &old_pass, &new_pass, output.clone(), in_place) {
+                Ok(()) => summary.succeeded += 1,
+                Err(e) => {
+                    print_error(&format!("{}: {}", display_path(file), e));
+                    summary.failed += 1;
+                }
+            }
+        }
+
+        if let Some(ref pb) = pb {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = pb {
+        pb.finish_and_clear();
+    }
+
+    if is_batch {
+        summary.print();
+    }
+
+    if summary.has_failures() {
+        bail!("{} file(s) failed", summary.failed);
+    }
+
+    Ok(())
+}
+
+fn change_password_single(
+    file: &Path,
+    old_pass: &str,
+    new_pass: &str,
+    output: Option<PathBuf>,
+    in_place: bool,
+) -> Result<()> {
+    let doc = reader::load_pdf(file)?;
     if !reader::is_encrypted(&doc) {
-        bail!(
-            "File is not encrypted: {}\nUse `pdfk lock` to encrypt it first.",
-            display_path(&file)
-        );
+        bail!("File is not encrypted. Use `pdfk lock` to encrypt it first.");
     }
 
     let enc_info = reader::parse_encryption_dict(&doc)?;
     let permissions = PdfPermissions::from_p_value(enc_info.p_value);
     drop(doc);
 
-    let (old_pass, new_pass) = password::resolve_old_new_passwords(old, new, password_stdin)?;
+    let mut decrypted_doc = reader::load_pdf_decrypted(file, old_pass)?;
 
-    // Load and decrypt using lopdf's built-in decryption.
-    let mut decrypted_doc = reader::load_pdf_decrypted(&file, &old_pass)?;
-
-    // Re-encrypt with the new password.
     let params = EncryptParams {
-        user_password: new_pass.clone().into_bytes(),
-        owner_password: new_pass.into_bytes(),
+        user_password: new_pass.as_bytes().to_vec(),
+        owner_password: new_pass.as_bytes().to_vec(),
         permissions,
     };
     writer::encrypt_pdf(&mut decrypted_doc, &params)?;
 
-    let output_path = resolve_output_path(&file, output, in_place)?;
+    let output_path = resolve_output_path(file, output, in_place)?;
     writer::save_pdf(&mut decrypted_doc, &output_path)?;
 
     print_success(&format!(
         "Password changed: {} → {}",
-        display_path(&file),
+        display_path(file),
         display_path(&output_path)
     ));
 

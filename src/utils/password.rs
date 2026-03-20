@@ -6,7 +6,10 @@ pub fn read_password_stdin() -> Result<String> {
     let stdin = io::stdin();
     let mut line = String::new();
     stdin.lock().read_line(&mut line)?;
-    let password = line.trim_end_matches('\n').trim_end_matches('\r').to_string();
+    let password = line
+        .trim_end_matches('\n')
+        .trim_end_matches('\r')
+        .to_string();
     if password.is_empty() {
         bail!("Empty password received from stdin");
     }

@@ -575,6 +575,217 @@ fn test_info_file_not_found() {
         .stderr(predicate::str::contains("File not found"));
 }
 
+// ==================== Static fixture tests (RC4-128, AES-128, AES-256 R5) ====================
+
+#[test]
+fn test_info_rc4_128_fixture() {
+    pdfk()
+        .args(&["info", "tests/fixtures/sample_rc4_128.pdf"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted:    yes"))
+        .stdout(predicate::str::contains("Algorithm:    RC4-128"))
+        .stdout(predicate::str::contains("Key length:   128 bits"))
+        .stdout(predicate::str::contains("Revision:     R3"));
+}
+
+#[test]
+fn test_info_aes_128_fixture() {
+    pdfk()
+        .args(&["info", "tests/fixtures/sample_aes_128.pdf"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted:    yes"))
+        .stdout(predicate::str::contains("Algorithm:    AES-128"))
+        .stdout(predicate::str::contains("Key length:   128 bits"))
+        .stdout(predicate::str::contains("Revision:     R4"))
+        .stdout(predicate::str::contains("Crypt filter: AESV2"));
+}
+
+#[test]
+fn test_info_aes_256_r5_fixture() {
+    pdfk()
+        .args(&["info", "tests/fixtures/sample_aes_256_r5.pdf"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted:    yes"))
+        .stdout(predicate::str::contains("Algorithm:    AES-256"))
+        .stdout(predicate::str::contains("Key length:   256 bits"))
+        .stdout(predicate::str::contains("Revision:     R5"))
+        .stdout(predicate::str::contains("Crypt filter: AESV3"));
+}
+
+#[test]
+fn test_check_rc4_128_fixture() {
+    pdfk()
+        .args(&[
+            "check",
+            "tests/fixtures/sample_rc4_128.pdf",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password is correct"));
+}
+
+#[test]
+fn test_check_aes_128_fixture() {
+    pdfk()
+        .args(&[
+            "check",
+            "tests/fixtures/sample_aes_128.pdf",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password is correct"));
+}
+
+#[test]
+fn test_check_aes_256_r5_fixture() {
+    pdfk()
+        .args(&[
+            "check",
+            "tests/fixtures/sample_aes_256_r5.pdf",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password is correct"));
+}
+
+#[test]
+fn test_unlock_rc4_128_fixture() {
+    let tmp = TempDir::new().unwrap();
+    let decrypted = tmp.path().join("decrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "unlock",
+            "tests/fixtures/sample_rc4_128.pdf",
+            "--password",
+            "testpass",
+            "--output",
+            decrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Decrypted"));
+
+    // Verify decrypted file is not encrypted
+    pdfk()
+        .args(&["info", decrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+}
+
+#[test]
+fn test_unlock_aes_128_fixture() {
+    let tmp = TempDir::new().unwrap();
+    let decrypted = tmp.path().join("decrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "unlock",
+            "tests/fixtures/sample_aes_128.pdf",
+            "--password",
+            "testpass",
+            "--output",
+            decrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Decrypted"));
+
+    pdfk()
+        .args(&["info", decrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+}
+
+#[test]
+fn test_unlock_aes_256_r5_fixture() {
+    let tmp = TempDir::new().unwrap();
+    let decrypted = tmp.path().join("decrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "unlock",
+            "tests/fixtures/sample_aes_256_r5.pdf",
+            "--password",
+            "testpass",
+            "--output",
+            decrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Decrypted"));
+
+    pdfk()
+        .args(&["info", decrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+}
+
+#[test]
+fn test_info_json_rc4_128_fixture() {
+    let output = pdfk()
+        .args(&["info", "tests/fixtures/sample_rc4_128.pdf", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(json["encrypted"], true);
+    assert_eq!(json["algorithm"], "RC4-128");
+    assert_eq!(json["key_length"], 128);
+    assert_eq!(json["revision"], "R3");
+}
+
+#[test]
+fn test_info_json_aes_128_fixture() {
+    let output = pdfk()
+        .args(&["info", "tests/fixtures/sample_aes_128.pdf", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(json["encrypted"], true);
+    assert_eq!(json["algorithm"], "AES-128");
+    assert_eq!(json["key_length"], 128);
+    assert_eq!(json["revision"], "R4");
+    assert_eq!(json["crypt_filter"], "AESV2");
+}
+
+#[test]
+fn test_info_json_aes_256_r5_fixture() {
+    let output = pdfk()
+        .args(&["info", "tests/fixtures/sample_aes_256_r5.pdf", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(json["encrypted"], true);
+    assert_eq!(json["algorithm"], "AES-256");
+    assert_eq!(json["key_length"], 256);
+    assert_eq!(json["revision"], "R5");
+    assert_eq!(json["crypt_filter"], "AESV3");
+}
+
 // ==================== Error path tests ====================
 
 #[test]
@@ -693,6 +904,450 @@ fn test_full_roundtrip_lock_check_unlock() {
         .stderr(predicate::str::contains("not encrypted"));
 }
 
+// ==================== Batch / Multi-file tests ====================
+
+#[test]
+fn test_lock_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let pdf1 = tmp.path().join("a.pdf");
+    let pdf2 = tmp.path().join("b.pdf");
+    let pdf3 = tmp.path().join("c.pdf");
+    fs::copy(sample_pdf(), &pdf1).unwrap();
+    fs::copy(sample_pdf(), &pdf2).unwrap();
+    fs::copy(sample_pdf(), &pdf3).unwrap();
+
+    pdfk()
+        .args(&[
+            "lock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            pdf3.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("3 succeeded, 0 failed, 0 skipped"));
+
+    // All three should now be encrypted
+    for pdf in [&pdf1, &pdf2, &pdf3] {
+        pdfk()
+            .args(&["check", pdf.to_str().unwrap(), "--password", "testpass"])
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn test_unlock_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let pdf1 = tmp.path().join("a.pdf");
+    let pdf2 = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &pdf1).unwrap();
+    fs::copy(sample_pdf(), &pdf2).unwrap();
+
+    // Lock both first
+    pdfk()
+        .args(&[
+            "lock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success();
+
+    // Unlock both
+    pdfk()
+        .args(&[
+            "unlock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
+
+    // Both should now be unencrypted
+    for pdf in [&pdf1, &pdf2] {
+        pdfk()
+            .args(&["info", pdf.to_str().unwrap()])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Encrypted: no"));
+    }
+}
+
+#[test]
+fn test_check_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let pdf1 = tmp.path().join("a.pdf");
+    let pdf2 = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &pdf1).unwrap();
+    fs::copy(sample_pdf(), &pdf2).unwrap();
+
+    pdfk()
+        .args(&[
+            "lock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "check",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
+}
+
+#[test]
+fn test_info_multiple_files() {
+    pdfk()
+        .args(&[
+            "info",
+            "tests/fixtures/sample.pdf",
+            "tests/fixtures/sample_rc4_128.pdf",
+            "tests/fixtures/sample_aes_128.pdf",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"))
+        .stdout(predicate::str::contains("Algorithm:    RC4-128"))
+        .stdout(predicate::str::contains("Algorithm:    AES-128"))
+        .stderr(predicate::str::contains("3 succeeded, 0 failed, 0 skipped"));
+}
+
+#[test]
+fn test_lock_folder() {
+    let tmp = TempDir::new().unwrap();
+    let subdir = tmp.path().join("pdfs");
+    fs::create_dir(&subdir).unwrap();
+    fs::copy(sample_pdf(), subdir.join("a.pdf")).unwrap();
+    fs::copy(sample_pdf(), subdir.join("b.pdf")).unwrap();
+
+    pdfk()
+        .args(&[
+            "lock",
+            subdir.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
+
+    // Both should be encrypted
+    pdfk()
+        .args(&[
+            "check",
+            subdir.join("a.pdf").to_str().unwrap(),
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success();
+    pdfk()
+        .args(&[
+            "check",
+            subdir.join("b.pdf").to_str().unwrap(),
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_lock_folder_recursive() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().join("docs");
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    fs::copy(sample_pdf(), root.join("top.pdf")).unwrap();
+    fs::copy(sample_pdf(), sub.join("nested.pdf")).unwrap();
+
+    // Without --recursive, only top-level files are processed
+    pdfk()
+        .args(&[
+            "lock",
+            root.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Encrypted"));
+
+    // Verify the nested file was NOT processed
+    pdfk()
+        .args(&["info", sub.join("nested.pdf").to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+
+    // Reset the top file
+    fs::copy(sample_pdf(), root.join("top.pdf")).unwrap();
+
+    // With --recursive, both are processed
+    pdfk()
+        .args(&[
+            "lock",
+            root.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+            "--recursive",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
+
+    pdfk()
+        .args(&[
+            "check",
+            sub.join("nested.pdf").to_str().unwrap(),
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_dry_run_lock() {
+    let (_tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "testpass", "--dry-run"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("[dry-run] Would encrypt"));
+
+    // File should NOT be encrypted
+    pdfk()
+        .args(&["info", &pdf_path])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted: no"));
+}
+
+#[test]
+fn test_dry_run_unlock() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "unlock",
+            encrypted.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("[dry-run] Would decrypt"));
+
+    // File should still be encrypted
+    pdfk()
+        .args(&["info", encrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Encrypted:    yes"));
+}
+
+#[test]
+fn test_batch_partial_failure() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let unencrypted = tmp.path().join("plain.pdf");
+
+    // Create an encrypted file
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    // Copy an unencrypted file
+    fs::copy(sample_pdf(), &unencrypted).unwrap();
+
+    // Try to unlock both — the unencrypted one should fail
+    pdfk()
+        .args(&[
+            "unlock",
+            encrypted.to_str().unwrap(),
+            unencrypted.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--in-place",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("1 succeeded, 1 failed, 0 skipped"));
+}
+
+#[test]
+fn test_output_not_allowed_with_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let pdf1 = tmp.path().join("a.pdf");
+    let pdf2 = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &pdf1).unwrap();
+    fs::copy(sample_pdf(), &pdf2).unwrap();
+
+    pdfk()
+        .args(&[
+            "lock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "testpass",
+            "--output",
+            "/tmp/out.pdf",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--output cannot be used with multiple files",
+        ));
+}
+
+#[test]
+fn test_info_folder() {
+    // Info on the fixtures directory
+    pdfk()
+        .args(&["info", "tests/fixtures"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("succeeded"));
+}
+
+#[test]
+fn test_change_password_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let pdf1 = tmp.path().join("a.pdf");
+    let pdf2 = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &pdf1).unwrap();
+    fs::copy(sample_pdf(), &pdf2).unwrap();
+
+    // Lock both
+    pdfk()
+        .args(&[
+            "lock",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--password",
+            "oldpass",
+            "--in-place",
+        ])
+        .assert()
+        .success();
+
+    // Change password on both
+    pdfk()
+        .args(&[
+            "change-password",
+            pdf1.to_str().unwrap(),
+            pdf2.to_str().unwrap(),
+            "--old",
+            "oldpass",
+            "--new",
+            "newpass",
+            "--in-place",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
+
+    // Verify new password works on both
+    for pdf in [&pdf1, &pdf2] {
+        pdfk()
+            .args(&["check", pdf.to_str().unwrap(), "--password", "newpass"])
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn test_dry_run_change_password() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "change-password",
+            encrypted.to_str().unwrap(),
+            "--old",
+            "testpass",
+            "--new",
+            "newpass",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("[dry-run] Would change password"));
+
+    // Password should still be the old one
+    pdfk()
+        .args(&[
+            "check",
+            encrypted.to_str().unwrap(),
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success();
+}
+
 // ==================== Help and version tests ====================
 
 #[test]
@@ -712,7 +1367,7 @@ fn test_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("pdfk 0.2.0"));
+        .stdout(predicate::str::contains("pdfk 0.3.0"));
 }
 
 #[test]
