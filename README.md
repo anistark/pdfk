@@ -29,9 +29,16 @@ cd pdfk
 cargo install --path .
 ```
 
-### Homebrew (coming soon)
+### Homebrew
 
 ```sh
+brew install anistark/tools/pdfk
+```
+
+Or tap first, then install:
+
+```sh
+brew tap anistark/tools
 brew install pdfk
 ```
 
