@@ -5,6 +5,36 @@ All notable changes to pdfk will be documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/anistark/pdfk/compare/v0.2.0...v0.3.0) - 2026-03-20
+
+### Added
+- **Batch processing**: All commands now accept multiple files, folders, and glob patterns
+  - Multiple file arguments: `pdfk unlock a.pdf b.pdf c.pdf`
+  - Glob patterns: `pdfk unlock *.pdf`
+  - Folder input: `pdfk lock folder/`
+  - `--recursive` / `-R` flag for recursive folder processing
+- **Progress bar** for batch operations using `indicatif`
+- **Summary output** after batch operations: `X succeeded, Y failed, Z skipped`
+- **`--dry-run` flag** on `lock`, `unlock`, and `change-password` — shows what would happen without modifying files
+- **Static test fixtures** for legacy encryption formats:
+  - RC4-128 (R3) encrypted PDF
+  - AES-128 (R4) encrypted PDF
+  - AES-256 R5 encrypted PDF
+- 25 new integration tests (73 total: 18 unit + 55 integration)
+  - 12 tests for static fixture info/check/unlock/JSON across all encryption formats
+  - 13 tests for batch operations: multi-file, folder, recursive, dry-run, partial failure, output guard
+
+### Changed
+- CLI arguments changed from single `file` to `files` (one or more) for all commands
+- `--output` is now restricted to single-file operations; errors with a helpful message when used with multiple files
+- JSON output for `info` with multiple files returns a JSON array
+
+### Fixed
+- 7 clippy warnings: `clone_on_copy`, `too_many_arguments`, `collapsible_match`, `uninlined_format_args`
+
+### Dependencies
+- Added `glob` 0.3
+
 ## [0.2.0](https://github.com/anistark/pdfk/compare/v0.1.1...v0.2.0) - 2026-03-16
 
 ### Added
