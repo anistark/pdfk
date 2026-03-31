@@ -29,6 +29,14 @@ pub enum Command {
         #[arg(long, group = "password_source")]
         password_stdin: bool,
 
+        /// Read password from an environment variable
+        #[arg(long, group = "password_source", value_name = "VAR")]
+        password_env: Option<String>,
+
+        /// Read password from a command's output
+        #[arg(long, group = "password_source", value_name = "CMD")]
+        password_cmd: Option<String>,
+
         /// User password (required to open/view)
         #[arg(short = 'u', long)]
         user_password: Option<String>,
@@ -80,6 +88,14 @@ pub enum Command {
         #[arg(long, group = "password_source")]
         password_stdin: bool,
 
+        /// Read password from an environment variable
+        #[arg(long, group = "password_source", value_name = "VAR")]
+        password_env: Option<String>,
+
+        /// Read password from a command's output
+        #[arg(long, group = "password_source", value_name = "CMD")]
+        password_cmd: Option<String>,
+
         /// Output file path (only valid with a single input file)
         #[arg(short, long, group = "output_mode")]
         output: Option<PathBuf>,
@@ -114,6 +130,22 @@ pub enum Command {
         /// Read passwords from stdin (old then new, one per line)
         #[arg(long)]
         password_stdin: bool,
+
+        /// Read current password from an environment variable
+        #[arg(long, value_name = "VAR")]
+        old_env: Option<String>,
+
+        /// Read new password from an environment variable
+        #[arg(long, value_name = "VAR")]
+        new_env: Option<String>,
+
+        /// Read current password from a command's output
+        #[arg(long, value_name = "CMD")]
+        old_cmd: Option<String>,
+
+        /// Read new password from a command's output
+        #[arg(long, value_name = "CMD")]
+        new_cmd: Option<String>,
 
         /// Output file path (only valid with a single input file)
         #[arg(short, long, group = "output_mode")]
@@ -160,6 +192,14 @@ pub enum Command {
         /// Read password from stdin
         #[arg(long, group = "password_source")]
         password_stdin: bool,
+
+        /// Read password from an environment variable
+        #[arg(long, group = "password_source", value_name = "VAR")]
+        password_env: Option<String>,
+
+        /// Read password from a command's output
+        #[arg(long, group = "password_source", value_name = "CMD")]
+        password_cmd: Option<String>,
 
         /// Process folders recursively
         #[arg(short = 'R', long)]

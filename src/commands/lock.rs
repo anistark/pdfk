@@ -12,6 +12,8 @@ pub fn execute(
     files: Vec<PathBuf>,
     password: Option<String>,
     password_stdin: bool,
+    password_env: Option<String>,
+    password_cmd: Option<String>,
     user_password: Option<String>,
     owner_password: Option<String>,
     no_print: bool,
@@ -24,18 +26,16 @@ pub fn execute(
 ) -> Result<()> {
     let resolved = batch::resolve_files(&files, recursive)?;
 
-    // --output is only valid with a single file
     if output.is_some() && resolved.len() > 1 {
         bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    // Resolve passwords once before processing
     let (user_pass, owner_pass) = if user_password.is_some() || owner_password.is_some() {
         let up = user_password.unwrap_or_default();
         let op = owner_password.unwrap_or_else(|| up.clone());
         (up, op)
     } else {
-        let p = resolve_password(password, password_stdin)?;
+        let p = resolve_password(password, password_stdin, password_env, password_cmd)?;
         (p.clone(), p)
     };
 

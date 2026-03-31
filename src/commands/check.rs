@@ -11,11 +11,13 @@ pub fn execute(
     files: Vec<PathBuf>,
     password: Option<String>,
     password_stdin: bool,
+    password_env: Option<String>,
+    password_cmd: Option<String>,
     recursive: bool,
 ) -> Result<()> {
     let resolved = batch::resolve_files(&files, recursive)?;
 
-    let pass = resolve_password(password, password_stdin)?;
+    let pass = resolve_password(password, password_stdin, password_env, password_cmd)?;
 
     let is_batch = resolved.len() > 1;
     let pb = batch::create_progress_bar(resolved.len());

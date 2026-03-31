@@ -13,6 +13,10 @@ pub fn execute(
     old: Option<String>,
     new: Option<String>,
     password_stdin: bool,
+    old_env: Option<String>,
+    new_env: Option<String>,
+    old_cmd: Option<String>,
+    new_cmd: Option<String>,
     output: Option<PathBuf>,
     in_place: bool,
     recursive: bool,
@@ -24,7 +28,8 @@ pub fn execute(
         bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    let (old_pass, new_pass) = password::resolve_old_new_passwords(old, new, password_stdin)?;
+    let (old_pass, new_pass) =
+        password::resolve_old_new_passwords(old, new, password_stdin, old_env, new_env, old_cmd, new_cmd)?;
 
     let is_batch = resolved.len() > 1;
     let pb = batch::create_progress_bar(resolved.len());

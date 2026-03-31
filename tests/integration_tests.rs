@@ -1367,7 +1367,7 @@ fn test_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("pdfk 0.3.0"));
+        .stdout(predicate::str::contains("pdfk 0.4.0"));
 }
 
 #[test]
@@ -1377,4 +1377,546 @@ fn test_subcommand_help() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypt a PDF"));
+}
+
+// ==================== Password env/cmd tests ====================
+
+#[test]
+fn test_lock_password_env() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-env",
+            "PDFK_TEST_PASS",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .env("PDFK_TEST_PASS", "envpass123")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Encrypted"));
+
+    pdfk()
+        .args(&["check", output.to_str().unwrap(), "--password", "envpass123"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_unlock_password_env() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let decrypted = tmp.path().join("decrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "envpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "unlock",
+            encrypted.to_str().unwrap(),
+            "--password-env",
+            "PDFK_TEST_PASS2",
+            "--output",
+            decrypted.to_str().unwrap(),
+        ])
+        .env("PDFK_TEST_PASS2", "envpass")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Decrypted"));
+}
+
+#[test]
+fn test_check_password_env() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "checkenv",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "check",
+            encrypted.to_str().unwrap(),
+            "--password-env",
+            "PDFK_CHECK_PASS",
+        ])
+        .env("PDFK_CHECK_PASS", "checkenv")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password is correct"));
+}
+
+#[test]
+fn test_password_env_not_set() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-env",
+            "PDFK_NONEXISTENT_VAR_12345",
+        ])
+        .env_remove("PDFK_NONEXISTENT_VAR_12345")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is not set"));
+}
+
+#[test]
+fn test_password_env_empty() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-env",
+            "PDFK_EMPTY_VAR",
+        ])
+        .env("PDFK_EMPTY_VAR", "")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is empty"));
+}
+
+#[test]
+fn test_lock_password_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-cmd",
+            "echo cmdpass456",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Encrypted"));
+
+    pdfk()
+        .args(&["check", output.to_str().unwrap(), "--password", "cmdpass456"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_unlock_password_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let decrypted = tmp.path().join("decrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "cmdunlock",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "unlock",
+            encrypted.to_str().unwrap(),
+            "--password-cmd",
+            "echo cmdunlock",
+            "--output",
+            decrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Decrypted"));
+}
+
+#[test]
+fn test_check_password_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "cmdcheck",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "check",
+            encrypted.to_str().unwrap(),
+            "--password-cmd",
+            "echo cmdcheck",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password is correct"));
+}
+
+#[test]
+fn test_password_cmd_failure() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-cmd",
+            "false",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Command exited with"));
+}
+
+#[test]
+fn test_change_password_env() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let changed = tmp.path().join("changed.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "oldenvpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "change-password",
+            encrypted.to_str().unwrap(),
+            "--old-env",
+            "PDFK_OLD",
+            "--new-env",
+            "PDFK_NEW",
+            "--output",
+            changed.to_str().unwrap(),
+        ])
+        .env("PDFK_OLD", "oldenvpass")
+        .env("PDFK_NEW", "newenvpass")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password changed"));
+
+    pdfk()
+        .args(&["check", changed.to_str().unwrap(), "--password", "newenvpass"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_change_password_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let changed = tmp.path().join("changed.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "oldcmdpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "change-password",
+            encrypted.to_str().unwrap(),
+            "--old-cmd",
+            "echo oldcmdpass",
+            "--new-cmd",
+            "echo newcmdpass",
+            "--output",
+            changed.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password changed"));
+
+    pdfk()
+        .args(&["check", changed.to_str().unwrap(), "--password", "newcmdpass"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_change_password_mixed_env_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let changed = tmp.path().join("changed.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "mixold",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "change-password",
+            encrypted.to_str().unwrap(),
+            "--old-env",
+            "PDFK_MIX_OLD",
+            "--new-cmd",
+            "echo mixnew",
+            "--output",
+            changed.to_str().unwrap(),
+        ])
+        .env("PDFK_MIX_OLD", "mixold")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password changed"));
+
+    pdfk()
+        .args(&["check", changed.to_str().unwrap(), "--password", "mixnew"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_lock_help_shows_env_cmd_flags() {
+    pdfk()
+        .args(&["lock", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--password-env"))
+        .stdout(predicate::str::contains("--password-cmd"));
+}
+
+#[test]
+fn test_check_help_shows_env_cmd_flags() {
+    pdfk()
+        .args(&["check", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--password-env"))
+        .stdout(predicate::str::contains("--password-cmd"));
+}
+
+#[test]
+fn test_change_password_help_shows_env_cmd_flags() {
+    pdfk()
+        .args(&["change-password", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--old-env"))
+        .stdout(predicate::str::contains("--new-env"))
+        .stdout(predicate::str::contains("--old-cmd"))
+        .stdout(predicate::str::contains("--new-cmd"));
+}
+
+#[test]
+fn test_unlock_help_shows_env_cmd_flags() {
+    pdfk()
+        .args(&["unlock", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--password-env"))
+        .stdout(predicate::str::contains("--password-cmd"));
+}
+
+#[test]
+fn test_password_cmd_empty_output() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-cmd",
+            "printf ''",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("empty"));
+}
+
+#[test]
+fn test_check_wrong_password_via_env() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "rightpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "check",
+            encrypted.to_str().unwrap(),
+            "--password-env",
+            "PDFK_WRONG",
+        ])
+        .env("PDFK_WRONG", "wrongpass")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Wrong password"));
+}
+
+#[test]
+fn test_check_wrong_password_via_cmd() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "rightpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "check",
+            encrypted.to_str().unwrap(),
+            "--password-cmd",
+            "echo wrongpass",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Wrong password"));
+}
+
+#[test]
+fn test_password_env_and_password_mutually_exclusive() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "test",
+            "--password-env",
+            "VAR",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn test_password_cmd_and_password_mutually_exclusive() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "test",
+            "--password-cmd",
+            "echo test",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn test_password_env_and_cmd_mutually_exclusive() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password-env",
+            "VAR",
+            "--password-cmd",
+            "echo test",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn test_change_password_mixed_cmd_env() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+    let changed = tmp.path().join("changed.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "cmdold",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&[
+            "change-password",
+            encrypted.to_str().unwrap(),
+            "--old-cmd",
+            "echo cmdold",
+            "--new-env",
+            "PDFK_MIX_NEW",
+            "--output",
+            changed.to_str().unwrap(),
+        ])
+        .env("PDFK_MIX_NEW", "envnew")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Password changed"));
+
+    pdfk()
+        .args(&["check", changed.to_str().unwrap(), "--password", "envnew"])
+        .assert()
+        .success();
 }

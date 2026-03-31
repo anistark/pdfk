@@ -6,10 +6,13 @@ use crate::pdf::writer;
 use crate::utils::batch::{self, BatchSummary};
 use crate::utils::{display_path, print_error, print_success, resolve_password};
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute(
     files: Vec<PathBuf>,
     password: Option<String>,
     password_stdin: bool,
+    password_env: Option<String>,
+    password_cmd: Option<String>,
     output: Option<PathBuf>,
     in_place: bool,
     recursive: bool,
@@ -21,7 +24,7 @@ pub fn execute(
         bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    let pass = resolve_password(password, password_stdin)?;
+    let pass = resolve_password(password, password_stdin, password_env, password_cmd)?;
 
     let is_batch = resolved.len() > 1;
     let pb = batch::create_progress_bar(resolved.len());
