@@ -10,12 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Homebrew support**: `brew install anistark/tools/pdfk` — available via the [anistark/tools](https://github.com/anistark/homebrew-tools) tap
   - Formula auto-updates on every release via GitHub Actions
+- **`pdfk audit` command**: Scan PDFs and report encryption status
+  - Human-readable table output with file, encryption, algorithm, revision, and permission columns
+  - `--json` flag for machine-readable output
+  - `--recursive` flag for nested folder traversal
+  - Exit code 0 when all files are encrypted, non-zero if any are unencrypted or errored
 - **`--password-env VAR`** flag on `lock`, `unlock`, `check` — read password from an environment variable
 - **`--password-cmd "cmd"`** flag on `lock`, `unlock`, `check` — read password from a command's stdout
 - **`--old-env` / `--new-env`** flags on `change-password` — read old/new passwords from environment variables
 - **`--old-cmd` / `--new-cmd`** flags on `change-password` — read old/new passwords from command output
 - Supports mixing sources (e.g. `--old-env VAR --new-cmd "echo pass"`)
-- 23 new integration tests (96 total: 18 unit + 78 integration)
+- 34 new integration tests (11 audit + 23 env/cmd)
 
 ## [0.3.0](https://github.com/anistark/pdfk/compare/v0.2.0...v0.3.0) - 2026-03-20
 

@@ -1920,3 +1920,191 @@ fn test_change_password_mixed_cmd_env() {
         .assert()
         .success();
 }
+
+// ==================== Audit tests ====================
+
+#[test]
+fn test_audit_unencrypted_file() {
+    pdfk()
+        .args(&["audit", &sample_pdf()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no"))
+        .stderr(predicate::str::contains("1 unencrypted"));
+}
+
+#[test]
+fn test_audit_encrypted_file() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["audit", encrypted.to_str().unwrap()])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("yes"))
+        .stderr(predicate::str::contains("1 encrypted"));
+}
+
+#[test]
+fn test_audit_mixed_files() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["audit", &sample_pdf(), encrypted.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("1 encrypted"))
+        .stderr(predicate::str::contains("1 unencrypted"));
+}
+
+#[test]
+fn test_audit_folder() {
+    pdfk()
+        .args(&["audit", "tests/fixtures/"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("ENCRYPTED"))
+        .stderr(predicate::str::contains("encrypted"))
+        .stderr(predicate::str::contains("unencrypted"));
+}
+
+#[test]
+fn test_audit_recursive() {
+    let tmp = TempDir::new().unwrap();
+    let subdir = tmp.path().join("sub");
+    fs::create_dir(&subdir).unwrap();
+    fs::copy(sample_pdf(), subdir.join("a.pdf")).unwrap();
+
+    pdfk()
+        .args(&["audit", tmp.path().to_str().unwrap(), "--recursive"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("1 unencrypted"));
+}
+
+#[test]
+fn test_audit_json_output() {
+    pdfk()
+        .args(&["audit", &sample_pdf(), "--json"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"encrypted\": false"));
+}
+
+#[test]
+fn test_audit_json_encrypted() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("enc.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "pass",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let output = pdfk()
+        .args(&["audit", encrypted.to_str().unwrap(), "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let entry = &json[0];
+    assert_eq!(entry["encrypted"], true);
+    assert_eq!(entry["algorithm"], "AES-256");
+    assert_eq!(entry["revision"], "R6");
+    assert!(entry["permissions"]["print"].as_bool().unwrap());
+}
+
+#[test]
+fn test_audit_file_not_found() {
+    pdfk()
+        .args(&["audit", "nonexistent.pdf"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_audit_exit_code_zero_all_encrypted() {
+    pdfk()
+        .args(&["audit", "tests/fixtures/sample_locked.pdf"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_audit_permissions_in_table() {
+    pdfk()
+        .args(&["audit", "tests/fixtures/sample_locked.pdf"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("✓"));
+}
+
+#[test]
+fn test_audit_with_restricted_permissions() {
+    let tmp = TempDir::new().unwrap();
+    let encrypted = tmp.path().join("restricted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "pass",
+            "--no-print",
+            "--no-copy",
+            "--output",
+            encrypted.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let output = pdfk()
+        .args(&["audit", encrypted.to_str().unwrap(), "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let perms = &json[0]["permissions"];
+    assert_eq!(perms["print"], false);
+    assert_eq!(perms["copy"], false);
+    assert_eq!(perms["edit"], true);
+}

@@ -179,6 +179,21 @@ pub enum Command {
         recursive: bool,
     },
 
+    /// Scan PDFs and report encryption status
+    Audit {
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
+    },
+
     /// Verify a password works without modifying the file
     Check {
         /// Input PDF file(s), folders, or glob patterns

@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod change_password;
 pub mod check;
 pub mod info;
@@ -93,6 +94,11 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             json,
             recursive,
         } => info::execute(files, json, recursive),
+        Command::Audit {
+            files,
+            json,
+            recursive,
+        } => audit::execute(files, json, recursive),
         Command::Check {
             files,
             password,

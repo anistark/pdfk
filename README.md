@@ -148,6 +148,37 @@ pdfk info document.pdf --json
 }
 ```
 
+### `audit` — Scan encryption status
+
+```sh
+pdfk audit folder/
+```
+
+```
+FILE                       ENCRYPTED  ALGORITHM  REVISION  PRINT  COPY   EDIT
+folder/contract.pdf           yes      AES-256      R6       ✓      ✓      ✓
+folder/invoice.pdf            no          —         —        —      —      —
+folder/report.pdf             yes      AES-128      R4       ✓      ✓      ✗
+
+Audit: 2 encrypted, 1 unencrypted, 0 errors (out of 3 files)
+```
+
+Exits `0` if all files are encrypted, non-zero if any are unencrypted or errored.
+
+```sh
+# Recursive scan
+pdfk audit folder/ --recursive
+
+# JSON output for scripting
+pdfk audit folder/ --json
+
+# Use in CI to enforce encryption policy
+if ! pdfk audit sensitive-docs/ --recursive 2>/dev/null; then
+    echo "POLICY VIOLATION: unencrypted PDFs found" >&2
+    exit 1
+fi
+```
+
 ### `check` — Verify a password
 
 ```sh
@@ -207,6 +238,20 @@ Change passwords periodically on encrypted archives without decrypting to disk:
 printf "oldpass\nnewpass" | pdfk change-password archive.pdf --password-stdin --in-place
 ```
 
+### Audit encryption compliance across a folder
+
+Scan a directory to find unencrypted PDFs — useful for security audits and compliance checks:
+
+```sh
+pdfk audit sensitive-docs/ --recursive
+
+# Enforce in CI: fail if any PDF is unencrypted
+pdfk audit release-artifacts/ --recursive || exit 1
+
+# JSON output for reporting
+pdfk audit archive/ --json | jq '[.[] | select(.encrypted == false)] | length'
+```
+
 ### Inspect encryption details before processing
 
 Check what encryption a PDF uses and what permissions are set — no password needed:
@@ -262,12 +307,14 @@ pdfk lock file.pdf --user-password reader --owner-password admin
 
 ## Secure Password Input
 
-Three ways to provide passwords, from most to least secure:
+Five ways to provide passwords, from most to least secure:
 
 | Method | Shell history | Visible in `ps` | Works in scripts |
 |---|---|---|---|
 | `--password` (bare, no value) | ✗ | ✗ | ✗ (needs TTY) |
 | `--password-stdin` | ✗ | ✗ | ✓ |
+| `--password-env VAR` | ✗ | ✗ | ✓ |
+| `--password-cmd "cmd"` | ✗ | ✗ | ✓ |
 | `--password mypass` | ✓ | ✓ | ✓ |
 
 For interactive use, prefer the bare `--password` flag. For automation, use `--password-stdin`.
