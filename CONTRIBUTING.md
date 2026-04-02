@@ -82,20 +82,43 @@ Tests cover all five commands (lock, unlock, change-password, check, info), erro
 3. Register it in `src/commands/mod.rs` (add `pub mod` and match arm in `dispatch`)
 4. Add integration tests in `tests/integration_tests.rs`
 
-## Output Guidelines
+## Output & Logging
 
-All human-facing output must go through the centralized output module (`src/utils/output.rs`). Do not use raw `println!` or `eprintln!` in command handlers.
+pdfk uses two output systems. Do not use raw `println!` or `eprintln!` in command handlers.
+
+### User-facing output (`src/utils/output.rs`)
+
+For messages meant for the end user (success, errors, data display):
 
 | Function | Stream | Quiet | Use for |
 |---|---|---|---|
 | `print_success(msg)` | stderr | suppressed | `✓` completion messages |
 | `print_error(msg)` | stderr | always shows | `✗` error messages |
-| `print_warning(msg)` | stderr | suppressed | `⚠` warnings |
-| `print_verbose(msg)` | stderr | verbose only | `·` step-by-step details |
 | `print_status(msg)` | stderr | suppressed | status lines (dry-run, tables, summaries) |
 | `write_stdout(msg)` | stdout | never suppressed | primary data output (info display, JSON) |
 
 Commands may use `colored::Colorize` for formatting strings passed to these helpers.
+
+### Structured logging (`log` crate)
+
+For diagnostic/debugging output, use the standard `log` macros:
+
+```rust
+use log::{info, debug, warn};
+
+info!("Loading {}", path);           // shown with --verbose and --debug
+debug!("Parsed {} objects", count);   // shown only with --debug
+warn!("Something unexpected");        // shown at default verbosity and above
+```
+
+| Flag | Log level | Prefix |
+|---|---|---|
+| `--quiet` | Off | |
+| *(default)* | Warn | `⚠` |
+| `--verbose` | Info | `·` |
+| `--debug` | Debug | `dbg` |
+
+Use `info!` for step-by-step progress (loading, encrypting, writing). Use `debug!` for internal details (encryption dict fields, object counts, key lengths). Use `warn!` for recoverable issues.
 
 ## Code Style
 
