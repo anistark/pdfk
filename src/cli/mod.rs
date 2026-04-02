@@ -9,6 +9,14 @@ use std::path::PathBuf;
     long_about = "A modern, developer-friendly CLI for managing PDF passwords and encryption.\nFully offline. Never sends data outside your machine."
 )]
 pub struct Cli {
+    /// Suppress all output except errors
+    #[arg(short, long, global = true, conflicts_with = "verbose")]
+    pub quiet: bool,
+
+    /// Show detailed output
+    #[arg(short, long, global = true, conflicts_with = "quiet")]
+    pub verbose: bool,
+
     #[command(subcommand)]
     pub command: Command,
 }

@@ -82,6 +82,21 @@ Tests cover all five commands (lock, unlock, change-password, check, info), erro
 3. Register it in `src/commands/mod.rs` (add `pub mod` and match arm in `dispatch`)
 4. Add integration tests in `tests/integration_tests.rs`
 
+## Output Guidelines
+
+All human-facing output must go through the centralized output module (`src/utils/output.rs`). Do not use raw `println!` or `eprintln!` in command handlers.
+
+| Function | Stream | Quiet | Use for |
+|---|---|---|---|
+| `print_success(msg)` | stderr | suppressed | `✓` completion messages |
+| `print_error(msg)` | stderr | always shows | `✗` error messages |
+| `print_warning(msg)` | stderr | suppressed | `⚠` warnings |
+| `print_verbose(msg)` | stderr | verbose only | `·` step-by-step details |
+| `print_status(msg)` | stderr | suppressed | status lines (dry-run, tables, summaries) |
+| `write_stdout(msg)` | stdout | never suppressed | primary data output (info display, JSON) |
+
+Commands may use `colored::Colorize` for formatting strings passed to these helpers.
+
 ## Code Style
 
 - **Minimal comments.** Use docstrings on public APIs, `TODO`/`FIXME` for known issues, and brief notes only where logic is non-obvious. Don't restate what the code does.

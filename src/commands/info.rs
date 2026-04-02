@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::utils::batch::{self, BatchSummary};
-use crate::utils::{display_path, print_error};
+use colored::Colorize;
+
+use crate::utils::{display_path, print_error, print_verbose, write_stdout};
 
 #[derive(Serialize)]
 struct InfoOutput {
@@ -43,6 +45,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
             pb.set_message(display_path(file));
         }
 
+        print_verbose(&format!("Inspecting {}", display_path(file)));
         match info_single(file, json, is_batch, &mut json_outputs) {
             Ok(()) => summary.succeeded += 1,
             Err(e) => {
@@ -62,7 +65,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
 
     // For JSON batch output, print as array
     if json && is_batch {
-        println!("{}", serde_json::to_string_pretty(&json_outputs)?);
+        write_stdout(&serde_json::to_string_pretty(&json_outputs)?);
     }
 
     if is_batch {
@@ -104,14 +107,14 @@ fn info_single(
             if is_batch {
                 json_outputs.push(output);
             } else {
-                println!("{}", serde_json::to_string_pretty(&output)?);
+                write_stdout(&serde_json::to_string_pretty(&output)?);
             }
         } else {
             if is_batch {
-                println!();
+                write_stdout("");
             }
-            println!("File:      {}", display_path(file));
-            println!("Encrypted: no");
+            write_stdout(&format!("File:      {}", display_path(file)));
+            write_stdout(&format!("Encrypted: {}", "no".dimmed()));
         }
         return Ok(());
     }
@@ -138,45 +141,45 @@ fn info_single(
         if is_batch {
             json_outputs.push(output);
         } else {
-            println!("{}", serde_json::to_string_pretty(&output)?);
+            write_stdout(&serde_json::to_string_pretty(&output)?);
         }
     } else {
         if is_batch {
-            println!();
+            write_stdout("");
         }
-        println!("File:         {}", display_path(file));
-        println!("Encrypted:    yes");
-        println!("Algorithm:    {algorithm}");
-        println!("Key length:   {} bits", enc.key_length);
-        println!("Revision:     R{}", enc.revision);
+        write_stdout(&format!("File:         {}", display_path(file)));
+        write_stdout(&format!("Encrypted:    {}", "yes".green()));
+        write_stdout(&format!("Algorithm:    {algorithm}"));
+        write_stdout(&format!("Key length:   {} bits", enc.key_length));
+        write_stdout(&format!("Revision:     R{}", enc.revision));
         if let Some(ref cfm) = enc.stm_cfm {
-            println!("Crypt filter: {cfm}");
+            write_stdout(&format!("Crypt filter: {cfm}"));
         }
-        println!("Permissions:");
-        println!(
+        write_stdout("Permissions:");
+        write_stdout(&format!(
             "  Print: {}",
             if perms.allow_print {
-                "allowed"
+                "allowed".green()
             } else {
-                "denied"
+                "denied".red()
             }
-        );
-        println!(
+        ));
+        write_stdout(&format!(
             "  Copy:  {}",
             if perms.allow_copy {
-                "allowed"
+                "allowed".green()
             } else {
-                "denied"
+                "denied".red()
             }
-        );
-        println!(
+        ));
+        write_stdout(&format!(
             "  Edit:  {}",
             if perms.allow_edit {
-                "allowed"
+                "allowed".green()
             } else {
-                "denied"
+                "denied".red()
             }
-        );
+        ));
     }
 
     Ok(())
