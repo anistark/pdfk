@@ -3,7 +3,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::output::{is_quiet, print_status, print_warning};
+use log::{debug, warn};
+
+use super::output::{is_quiet, print_status};
 
 /// Resolve a list of input paths into individual PDF files.
 /// Handles:
@@ -24,13 +26,13 @@ pub fn resolve_files(inputs: &[PathBuf], recursive: bool) -> Result<Vec<PathBuf>
                 .filter(|p| p.is_file() && has_pdf_extension(p))
                 .collect();
             if matches.is_empty() {
-                print_warning(&format!("no PDF files matched pattern '{input_str}'"));
+                warn!("No PDF files matched pattern '{input_str}'");
             }
             files.extend(matches);
         } else if input.is_dir() {
             let dir_files = collect_pdfs_from_dir(input, recursive)?;
             if dir_files.is_empty() {
-                print_warning(&format!("no PDF files found in {}", input.display()));
+                warn!("No PDF files found in {}", input.display());
             }
             files.extend(dir_files);
         } else if input.is_file() {
@@ -44,9 +46,10 @@ pub fn resolve_files(inputs: &[PathBuf], recursive: bool) -> Result<Vec<PathBuf>
         bail!("No PDF files found");
     }
 
-    // Sort for consistent ordering and deduplicate
     files.sort();
     files.dedup();
+
+    debug!("Resolved {} PDF file(s)", files.len());
 
     Ok(files)
 }

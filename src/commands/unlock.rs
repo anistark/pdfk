@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use crate::pdf::reader;
 use crate::pdf::writer;
 use crate::utils::batch::{self, BatchSummary};
-use crate::utils::{display_path, print_error, print_status, print_success, print_verbose, resolve_password};
+use log::info;
+
+use crate::utils::{display_path, print_error, print_status, print_success, resolve_password};
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute(
@@ -75,18 +77,18 @@ pub fn execute(
 }
 
 fn unlock_single(file: &Path, pass: &str, output: Option<PathBuf>, in_place: bool) -> Result<()> {
-    print_verbose(&format!("Loading {}", display_path(file)));
+    info!("Loading {}", display_path(file));
     let doc = reader::load_pdf(file)?;
     if !reader::is_encrypted(&doc) {
         bail!("File is not encrypted: {}", display_path(file));
     }
     drop(doc);
 
-    print_verbose("Decrypting PDF");
+    info!("Decrypting PDF");
     let mut decrypted_doc = reader::load_pdf_decrypted(file, pass)?;
 
     let output_path = resolve_output_path(file, output, in_place)?;
-    print_verbose(&format!("Writing to {}", display_path(&output_path)));
+    info!("Writing to {}", display_path(&output_path));
     writer::save_pdf(&mut decrypted_doc, &output_path)?;
 
     print_success(&format!(

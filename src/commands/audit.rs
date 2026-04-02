@@ -7,7 +7,9 @@ use colored::Colorize;
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::utils::batch;
-use crate::utils::{display_path, is_quiet, print_status, print_verbose, write_stdout};
+use log::info;
+
+use crate::utils::{display_path, is_quiet, print_status, write_stdout};
 
 #[derive(Serialize)]
 struct AuditEntry {
@@ -52,7 +54,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
             pb.set_message(display_path(file));
         }
 
-        print_verbose(&format!("Scanning {}", display_path(file)));
+        info!("Scanning {}", display_path(file));
         let entry = audit_single(file);
         match &entry {
             e if e.error.is_some() => stats.errors += 1,

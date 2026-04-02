@@ -17,6 +17,10 @@ pub struct Cli {
     #[arg(short, long, global = true, conflicts_with = "quiet")]
     pub verbose: bool,
 
+    /// Show debug-level output (includes verbose)
+    #[arg(long, global = true, conflicts_with = "quiet")]
+    pub debug: bool,
+
     #[command(subcommand)]
     pub command: Command,
 }

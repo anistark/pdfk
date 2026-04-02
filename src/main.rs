@@ -5,18 +5,22 @@ mod pdf;
 mod utils;
 
 use anyhow::Result;
-use utils::output::{set_verbosity, Verbosity};
+use utils::output::{init_output, Verbosity};
 
 fn main() -> Result<()> {
     let cli = cli::parse();
 
-    if cli.quiet {
-        set_verbosity(Verbosity::Quiet);
+    let verbosity = if cli.quiet {
+        Verbosity::Quiet
+    } else if cli.debug {
+        Verbosity::Debug
     } else if cli.verbose {
-        set_verbosity(Verbosity::Verbose);
+        Verbosity::Verbose
     } else {
-        set_verbosity(Verbosity::Normal);
-    }
+        Verbosity::Normal
+    };
+
+    init_output(verbosity);
 
     commands::dispatch(cli)
 }

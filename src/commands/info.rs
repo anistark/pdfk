@@ -7,7 +7,9 @@ use crate::pdf::reader;
 use crate::utils::batch::{self, BatchSummary};
 use colored::Colorize;
 
-use crate::utils::{display_path, print_error, print_verbose, write_stdout};
+use log::info;
+
+use crate::utils::{display_path, print_error, write_stdout};
 
 #[derive(Serialize)]
 struct InfoOutput {
@@ -45,7 +47,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
             pb.set_message(display_path(file));
         }
 
-        print_verbose(&format!("Inspecting {}", display_path(file)));
+        info!("Inspecting {}", display_path(file));
         match info_single(file, json, is_batch, &mut json_outputs) {
             Ok(()) => summary.succeeded += 1,
             Err(e) => {

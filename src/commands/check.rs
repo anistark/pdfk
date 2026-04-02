@@ -5,7 +5,9 @@ use std::process;
 use crate::core::encryption;
 use crate::pdf::reader;
 use crate::utils::batch::{self, BatchSummary};
-use crate::utils::{display_path, print_error, print_success, print_verbose, resolve_password};
+use log::{debug, info};
+
+use crate::utils::{display_path, print_error, print_success, resolve_password};
 
 pub fn execute(
     files: Vec<PathBuf>,
@@ -68,7 +70,7 @@ fn check_single(file: &Path, pass: &str) -> Result<bool> {
         bail!("File not found: {}", display_path(file));
     }
 
-    print_verbose(&format!("Loading {}", display_path(file)));
+    info!("Loading {}", display_path(file));
     let doc = reader::load_pdf(file)?;
 
     if !reader::is_encrypted(&doc) {
@@ -77,7 +79,8 @@ fn check_single(file: &Path, pass: &str) -> Result<bool> {
 
     let enc_info = reader::parse_encryption_dict(&doc)?;
 
-    print_verbose(&format!("Verifying against R{} encryption", enc_info.revision));
+    info!("Verifying against R{} encryption", enc_info.revision);
+    debug!("Key length: {} bits, encrypt_metadata: {}", enc_info.key_length, enc_info.encrypt_metadata);
     let valid = match enc_info.revision {
         6 => {
             encryption::verify_user_password_r6(

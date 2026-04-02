@@ -2289,3 +2289,57 @@ fn test_quiet_audit_suppresses_table() {
         .failure()
         .stderr(predicate::str::contains("FILE").not());
 }
+
+// ==================== Debug flag tests ====================
+
+#[test]
+fn test_debug_lock_shows_debug_details() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "--debug",
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Loading")
+                .and(predicate::str::contains("Encrypting"))
+                .and(predicate::str::contains("objects")),
+        );
+}
+
+#[test]
+fn test_debug_check_shows_encryption_details() {
+    let (_tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["--debug", "check", &pdf_path, "--password", "pass"])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Encryption dict")
+                .and(predicate::str::contains("Key length")),
+        );
+}
+
+#[test]
+fn test_debug_and_quiet_conflict() {
+    pdfk()
+        .args(&["--quiet", "--debug", "info", &sample_pdf()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
