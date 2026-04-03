@@ -2108,3 +2108,238 @@ fn test_audit_with_restricted_permissions() {
     assert_eq!(perms["copy"], false);
     assert_eq!(perms["edit"], true);
 }
+
+// ==================== Quiet flag tests ====================
+
+#[test]
+fn test_quiet_lock_suppresses_output() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "--quiet",
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+
+    assert!(output.exists());
+}
+
+#[test]
+fn test_quiet_unlock_suppresses_output() {
+    let (tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    let unlocked = tmp.path().join("unlocked.pdf");
+    pdfk()
+        .args(&[
+            "--quiet",
+            "unlock",
+            &pdf_path,
+            "--password",
+            "pass",
+            "--output",
+            unlocked.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn test_quiet_check_suppresses_output() {
+    let (_tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["--quiet", "check", &pdf_path, "--password", "pass"])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn test_quiet_still_shows_errors() {
+    pdfk()
+        .args(&["--quiet", "lock", "nonexistent.pdf", "--password", "pass"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found").or(predicate::str::contains("No such file")));
+}
+
+#[test]
+fn test_quiet_and_verbose_conflict() {
+    pdfk()
+        .args(&["--quiet", "--verbose", "info", &sample_pdf()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+// ==================== Verbose flag tests ====================
+
+#[test]
+fn test_verbose_lock_shows_details() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "--verbose",
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Loading")
+                .and(predicate::str::contains("Encrypting"))
+                .and(predicate::str::contains("Writing")),
+        );
+}
+
+#[test]
+fn test_verbose_unlock_shows_details() {
+    let (tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    let unlocked = tmp.path().join("unlocked.pdf");
+    pdfk()
+        .args(&[
+            "--verbose",
+            "unlock",
+            &pdf_path,
+            "--password",
+            "pass",
+            "--output",
+            unlocked.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Loading")
+                .and(predicate::str::contains("Decrypting")),
+        );
+}
+
+#[test]
+fn test_verbose_check_shows_details() {
+    let (_tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["--verbose", "check", &pdf_path, "--password", "pass"])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Loading")
+                .and(predicate::str::contains("Verifying")),
+        );
+}
+
+#[test]
+fn test_quiet_dry_run_suppresses_output() {
+    pdfk()
+        .args(&[
+            "--quiet",
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "pass",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::is_empty());
+}
+
+#[test]
+fn test_quiet_audit_suppresses_table() {
+    pdfk()
+        .args(&["--quiet", "audit", &sample_pdf()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("FILE").not());
+}
+
+// ==================== Debug flag tests ====================
+
+#[test]
+fn test_debug_lock_shows_debug_details() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "--debug",
+            "lock",
+            &sample_pdf(),
+            "--password",
+            "testpass",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Loading")
+                .and(predicate::str::contains("Encrypting"))
+                .and(predicate::str::contains("objects")),
+        );
+}
+
+#[test]
+fn test_debug_check_shows_encryption_details() {
+    let (_tmp, pdf_path) = copy_sample_to_temp();
+
+    pdfk()
+        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .assert()
+        .success();
+
+    pdfk()
+        .args(&["--debug", "check", &pdf_path, "--password", "pass"])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Encryption dict")
+                .and(predicate::str::contains("Key length")),
+        );
+}
+
+#[test]
+fn test_debug_and_quiet_conflict() {
+    pdfk()
+        .args(&["--quiet", "--debug", "info", &sample_pdf()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}

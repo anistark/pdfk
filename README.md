@@ -10,7 +10,7 @@ Fast, offline, and secure — your files never leave your machine.
 - **Fully offline** — zero network calls, no telemetry, no file uploads
 - **AES-256 encryption** — uses the strongest PDF encryption standard (PDF 2.0, R6)
 - **Single binary** — no runtime dependencies, no Python/Java/Node required
-- **Script-friendly** — stdin password input, exit codes, quiet operation for CI/CD pipelines
+- **Script-friendly** — stdin password input, exit codes, `--quiet`/`--verbose` modes for CI/CD pipelines
 - **Preserves fidelity** — images, fonts, and all PDF content survive lock/unlock roundtrips intact
 
 ## Install
@@ -318,6 +318,28 @@ Five ways to provide passwords, from most to least secure:
 | `--password mypass` | ✓ | ✓ | ✓ |
 
 For interactive use, prefer the bare `--password` flag. For automation, use `--password-stdin`.
+
+## Output Control
+
+All commands support global `--quiet` and `--verbose` flags:
+
+```sh
+# Suppress all output except errors (useful in scripts and CI)
+pdfk lock document.pdf --password mypass --in-place --quiet
+
+# Show step-by-step details
+pdfk lock document.pdf --password mypass --verbose
+# · Loading document.pdf
+# · Encrypting with AES-256 R6
+# · Writing to document_locked.pdf
+# ✓ Encrypted document.pdf → document_locked.pdf
+```
+
+Output is colored by default (green for success, red for errors). Set the `NO_COLOR` environment variable to disable colors:
+
+```sh
+NO_COLOR=1 pdfk info document.pdf
+```
 
 ## Encryption Support
 

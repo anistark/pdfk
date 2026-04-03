@@ -5,7 +5,9 @@ use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::pdf::writer::{self, EncryptParams};
 use crate::utils::batch::{self, BatchSummary};
-use crate::utils::{display_path, password, print_error, print_success};
+use log::info;
+
+use crate::utils::{display_path, password, print_error, print_status, print_success};
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute(
@@ -43,11 +45,11 @@ pub fn execute(
         if dry_run {
             let output_path = resolve_output_path(file, output.clone(), in_place)
                 .unwrap_or_else(|_| file.clone());
-            eprintln!(
+            print_status(&format!(
                 "[dry-run] Would change password: {} → {}",
                 display_path(file),
                 display_path(&output_path)
-            );
+            ));
             summary.succeeded += 1;
         } else {
             match change_password_single(file, &old_pass, &new_pass, output.clone(), in_place) {
@@ -86,6 +88,7 @@ fn change_password_single(
     output: Option<PathBuf>,
     in_place: bool,
 ) -> Result<()> {
+    info!("Loading {}", display_path(file));
     let doc = reader::load_pdf(file)?;
     if !reader::is_encrypted(&doc) {
         bail!("File is not encrypted. Use `pdfk lock` to encrypt it first.");
@@ -95,6 +98,7 @@ fn change_password_single(
     let permissions = PdfPermissions::from_p_value(enc_info.p_value);
     drop(doc);
 
+    info!("Decrypting with old password");
     let mut decrypted_doc = reader::load_pdf_decrypted(file, old_pass)?;
 
     let params = EncryptParams {
@@ -102,9 +106,11 @@ fn change_password_single(
         owner_password: new_pass.as_bytes().to_vec(),
         permissions,
     };
+    info!("Re-encrypting with new password");
     writer::encrypt_pdf(&mut decrypted_doc, &params)?;
 
     let output_path = resolve_output_path(file, output, in_place)?;
+    info!("Writing to {}", display_path(&output_path));
     writer::save_pdf(&mut decrypted_doc, &output_path)?;
 
     print_success(&format!(

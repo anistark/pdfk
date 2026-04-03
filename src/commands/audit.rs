@@ -2,10 +2,14 @@ use anyhow::{bail, Result};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+use colored::Colorize;
+
 use crate::core::permissions::PdfPermissions;
 use crate::pdf::reader;
 use crate::utils::batch;
-use crate::utils::display_path;
+use log::info;
+
+use crate::utils::{display_path, is_quiet, print_status, write_stdout};
 
 #[derive(Serialize)]
 struct AuditEntry {
@@ -50,6 +54,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
             pb.set_message(display_path(file));
         }
 
+        info!("Scanning {}", display_path(file));
         let entry = audit_single(file);
         match &entry {
             e if e.error.is_some() => stats.errors += 1,
@@ -68,17 +73,17 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
     }
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&entries)?);
-    } else {
+        write_stdout(&serde_json::to_string_pretty(&entries)?);
+    } else if !is_quiet() {
         print_table(&entries);
-        eprintln!();
-        eprintln!(
+        print_status("");
+        print_status(&format!(
             "Audit: {} encrypted, {} unencrypted, {} errors (out of {} files)",
             stats.encrypted,
             stats.unencrypted,
             stats.errors,
             entries.len()
-        );
+        ));
     }
 
     if stats.unencrypted > 0 || stats.errors > 0 {
@@ -168,7 +173,7 @@ fn print_table(entries: &[AuditEntry]) {
         .unwrap_or(4)
         .max(4);
 
-    eprintln!(
+    print_status(&format!(
         "{:<width$}  {:^9}  {:^9}  {:^8}  {:^5}  {:^5}  {:^5}",
         "FILE",
         "ENCRYPTED",
@@ -178,8 +183,8 @@ fn print_table(entries: &[AuditEntry]) {
         "COPY",
         "EDIT",
         width = max_file
-    );
-    eprintln!(
+    ));
+    print_status(&format!(
         "{:<width$}  {:─^9}  {:─^9}  {:─^8}  {:─^5}  {:─^5}  {:─^5}",
         "─".repeat(max_file),
         "",
@@ -189,21 +194,21 @@ fn print_table(entries: &[AuditEntry]) {
         "",
         "",
         width = max_file
-    );
+    ));
 
     for entry in entries {
         if let Some(ref err) = entry.error {
-            eprintln!(
+            print_status(&format!(
                 "{:<width$}  {:^9}  {}",
                 entry.file,
                 "ERROR",
                 err,
                 width = max_file
-            );
+            ));
             continue;
         }
 
-        let encrypted = if entry.encrypted { "yes" } else { "no" };
+        let encrypted_str = if entry.encrypted { "yes" } else { "no" };
         let algorithm = entry.algorithm.as_deref().unwrap_or("—");
         let revision = entry.revision.as_deref().unwrap_or("—");
 
@@ -216,17 +221,23 @@ fn print_table(entries: &[AuditEntry]) {
             None => ("—", "—", "—"),
         };
 
-        eprintln!(
-            "{:<width$}  {:^9}  {:^9}  {:^8}  {:^5}  {:^5}  {:^5}",
+        let encrypted_colored = if entry.encrypted {
+            format!("{:^9}", encrypted_str).green().to_string()
+        } else {
+            format!("{:^9}", encrypted_str).red().to_string()
+        };
+
+        print_status(&format!(
+            "{:<width$}  {}  {:^9}  {:^8}  {:^5}  {:^5}  {:^5}",
             entry.file,
-            encrypted,
+            encrypted_colored,
             algorithm,
             revision,
             print,
             copy,
             edit,
             width = max_file
-        );
+        ));
     }
 }
 

@@ -3,6 +3,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use log::{debug, warn};
+
+use super::output::{is_quiet, print_status};
+
 /// Resolve a list of input paths into individual PDF files.
 /// Handles:
 /// - Regular files (passed through)
@@ -22,13 +26,13 @@ pub fn resolve_files(inputs: &[PathBuf], recursive: bool) -> Result<Vec<PathBuf>
                 .filter(|p| p.is_file() && has_pdf_extension(p))
                 .collect();
             if matches.is_empty() {
-                eprintln!("Warning: no PDF files matched pattern '{input_str}'");
+                warn!("No PDF files matched pattern '{input_str}'");
             }
             files.extend(matches);
         } else if input.is_dir() {
             let dir_files = collect_pdfs_from_dir(input, recursive)?;
             if dir_files.is_empty() {
-                eprintln!("Warning: no PDF files found in {}", input.display());
+                warn!("No PDF files found in {}", input.display());
             }
             files.extend(dir_files);
         } else if input.is_file() {
@@ -42,9 +46,10 @@ pub fn resolve_files(inputs: &[PathBuf], recursive: bool) -> Result<Vec<PathBuf>
         bail!("No PDF files found");
     }
 
-    // Sort for consistent ordering and deduplicate
     files.sort();
     files.dedup();
+
+    debug!("Resolved {} PDF file(s)", files.len());
 
     Ok(files)
 }
@@ -88,11 +93,11 @@ pub struct BatchSummary {
 impl BatchSummary {
     pub fn print(&self) {
         let total = self.succeeded + self.failed + self.skipped;
-        eprintln!();
-        eprintln!(
+        print_status("");
+        print_status(&format!(
             "Summary: {} succeeded, {} failed, {} skipped (out of {} files)",
             self.succeeded, self.failed, self.skipped, total
-        );
+        ));
     }
 
     pub fn has_failures(&self) -> bool {
@@ -102,7 +107,7 @@ impl BatchSummary {
 
 /// Create a progress bar for batch operations. Returns None for single-file operations.
 pub fn create_progress_bar(total: usize) -> Option<ProgressBar> {
-    if total <= 1 {
+    if total <= 1 || is_quiet() {
         return None;
     }
 

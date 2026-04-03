@@ -20,7 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--old-env` / `--new-env`** flags on `change-password` — read old/new passwords from environment variables
 - **`--old-cmd` / `--new-cmd`** flags on `change-password` — read old/new passwords from command output
 - Supports mixing sources (e.g. `--old-env VAR --new-cmd "echo pass"`)
-- 34 new integration tests (11 audit + 23 env/cmd)
+- **Colored terminal output**: success messages in green, errors in red, warnings in yellow, verbose output dimmed. Respects the `NO_COLOR` environment variable.
+- **`--quiet` / `-q` flag** (global): suppress all output except errors — useful for scripting and CI
+- **`--verbose` / `-v` flag** (global): show step-by-step details (loading, encrypting, writing)
+- **`--debug` flag** (global): show debug-level output — encryption dict fields, object counts, key lengths, permissions, crypt filters
+- **Structured logging** via `log` + `env_logger`: `--verbose` maps to `info`, `--debug` maps to `debug`; warnings from dependencies (e.g. lopdf) route through `log::warn`
+- 47 new integration tests (11 audit + 23 env/cmd + 13 quiet/verbose/debug)
+
+### Changed
+- All human-facing output now routes through a centralized output module (`src/utils/output.rs`) with consistent formatting and verbosity control
+
+### Dependencies
+- Added `colored` 3.0
+- Added `log` 0.4
+- Added `env_logger` 0.11
+
+
 
 ## [0.3.0](https://github.com/anistark/pdfk/compare/v0.2.0...v0.3.0) - 2026-03-20
 
