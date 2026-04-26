@@ -122,8 +122,14 @@ pub fn parse_encryption_dict(doc: &Document) -> Result<EncryptionInfo> {
     let stm_cfm = parse_stm_cfm(dict);
 
     debug!("Encryption dict: filter={filter}, V={version}, R={revision}, key_length={key_length}, P={p_value}");
-    debug!("Crypt filter: {:?}, encrypt_metadata: {encrypt_metadata}", stm_cfm);
-    debug!("U: {} bytes, O: {} bytes, UE: {} bytes, OE: {} bytes", u_value.len(), o_value.len(), ue_value.len(), oe_value.len());
+    debug!("Crypt filter: {stm_cfm:?}, encrypt_metadata: {encrypt_metadata}");
+    debug!(
+        "U: {} bytes, O: {} bytes, UE: {} bytes, OE: {} bytes",
+        u_value.len(),
+        o_value.len(),
+        ue_value.len(),
+        oe_value.len()
+    );
 
     Ok(EncryptionInfo {
         filter,

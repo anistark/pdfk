@@ -30,8 +30,15 @@ pub fn execute(
         bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    let (old_pass, new_pass) =
-        password::resolve_old_new_passwords(old, new, password_stdin, old_env, new_env, old_cmd, new_cmd)?;
+    let (old_pass, new_pass) = password::resolve_old_new_passwords(
+        old,
+        new,
+        password_stdin,
+        old_env,
+        new_env,
+        old_cmd,
+        new_cmd,
+    )?;
 
     let is_batch = resolved.len() > 1;
     let pb = batch::create_progress_bar(resolved.len());

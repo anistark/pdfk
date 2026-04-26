@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased](https://github.com/anistark/pdfk/compare/v0.3.0...HEAD)
 
 ### Added
+- **`--generate-password` flag on `lock`**: Generate a strong 24-character random password and copy it to the clipboard
+  - Uses an unambiguous alphabet (no `0/O/I/l/1`) for share-friendliness
+  - Cross-platform clipboard via `arboard` (macOS, Linux, Windows)
+  - Prints the password once on stderr; falls back to a clear "save it manually" message if the clipboard is unavailable
+  - Works with `--dry-run` (skips clipboard, still prints)
+  - Mutually exclusive with `--password`, `--password-stdin`, `--password-env`, `--password-cmd`, `--user-password`, `--owner-password`
 - **Homebrew support**: `brew install anistark/tools/pdfk` — available via the [anistark/tools](https://github.com/anistark/homebrew-tools) tap
   - Formula auto-updates on every release via GitHub Actions
 - **`pdfk audit` command**: Scan PDFs and report encryption status

@@ -16,6 +16,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_stdin,
             password_env,
             password_cmd,
+            generate_password,
             user_password,
             owner_password,
             no_print,
@@ -31,6 +32,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_stdin,
             password_env,
             password_cmd,
+            generate_password,
             user_password,
             owner_password,
             no_print,
@@ -106,6 +108,13 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_env,
             password_cmd,
             recursive,
-        } => check::execute(files, password, password_stdin, password_env, password_cmd, recursive),
+        } => check::execute(
+            files,
+            password,
+            password_stdin,
+            password_env,
+            password_cmd,
+            recursive,
+        ),
     }
 }
