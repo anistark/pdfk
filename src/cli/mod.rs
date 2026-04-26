@@ -37,6 +37,10 @@ pub enum Command {
         #[arg(long, group = "password_source", value_name = "CMD")]
         password_cmd: Option<String>,
 
+        /// Generate a strong random password and copy it to the clipboard
+        #[arg(long, group = "password_source")]
+        generate_password: bool,
+
         /// User password (required to open/view)
         #[arg(short = 'u', long)]
         user_password: Option<String>,

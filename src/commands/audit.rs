@@ -82,11 +82,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
     }
 
     if stats.unencrypted > 0 || stats.errors > 0 {
-        bail!(
-            "{} unencrypted, {} errors",
-            stats.unencrypted,
-            stats.errors
-        );
+        bail!("{} unencrypted, {} errors", stats.unencrypted, stats.errors);
     }
 
     Ok(())
