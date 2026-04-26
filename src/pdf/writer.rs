@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use log::debug;
 use lopdf::{Document, Object, ObjectId, StringFormat};
 use std::path::Path;
 
@@ -22,6 +23,7 @@ pub fn encrypt_pdf(doc: &mut Document, params: &EncryptParams) -> Result<()> {
     let (o_value, oe_value) = compute_o_oe_r6(&params.owner_password, &file_key, &u_value);
     let perms_value = compute_perms_r6(&file_key, p_value, true);
 
+    debug!("Encrypting {} objects", doc.objects.len());
     encrypt_objects(doc, &file_key)?;
 
     let encrypt_dict = lopdf::Dictionary::from_iter(vec![
@@ -69,6 +71,7 @@ pub fn encrypt_pdf(doc: &mut Document, params: &EncryptParams) -> Result<()> {
 }
 
 pub fn save_pdf(doc: &mut Document, path: &Path) -> Result<()> {
+    debug!("Saving PDF to {}", path.display());
     doc.save(path)
         .with_context(|| format!("Failed to save PDF to {}", path.display()))?;
     Ok(())
