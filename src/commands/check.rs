@@ -80,7 +80,10 @@ fn check_single(file: &Path, pass: &str) -> Result<bool> {
     let enc_info = reader::parse_encryption_dict(&doc)?;
 
     info!("Verifying against R{} encryption", enc_info.revision);
-    debug!("Key length: {} bits, encrypt_metadata: {}", enc_info.key_length, enc_info.encrypt_metadata);
+    debug!(
+        "Key length: {} bits, encrypt_metadata: {}",
+        enc_info.key_length, enc_info.encrypt_metadata
+    );
     let valid = match enc_info.revision {
         6 => {
             encryption::verify_user_password_r6(

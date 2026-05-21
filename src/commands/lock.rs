@@ -7,7 +7,10 @@ use crate::pdf::writer::{self, EncryptParams};
 use crate::utils::batch::{self, BatchSummary};
 use log::{debug, info};
 
-use crate::utils::{display_path, print_error, print_status, print_success, resolve_password};
+use crate::utils::{
+    copy_to_clipboard, display_path, generate_password, print_error, print_status, print_success,
+    resolve_password,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute(
@@ -16,6 +19,7 @@ pub fn execute(
     password_stdin: bool,
     password_env: Option<String>,
     password_cmd: Option<String>,
+    generate: bool,
     user_password: Option<String>,
     owner_password: Option<String>,
     no_print: bool,
@@ -32,13 +36,20 @@ pub fn execute(
         bail!("--output cannot be used with multiple files. Use --in-place instead.");
     }
 
-    let (user_pass, owner_pass) = if user_password.is_some() || owner_password.is_some() {
+    if generate && (user_password.is_some() || owner_password.is_some()) {
+        bail!("--generate-password cannot be combined with --user-password or --owner-password");
+    }
+
+    let (user_pass, owner_pass, generated) = if generate {
+        let pw = generate_password();
+        (pw.clone(), pw.clone(), Some(pw))
+    } else if user_password.is_some() || owner_password.is_some() {
         let up = user_password.unwrap_or_default();
         let op = owner_password.unwrap_or_else(|| up.clone());
-        (up, op)
+        (up, op, None)
     } else {
         let p = resolve_password(password, password_stdin, password_env, password_cmd)?;
-        (p.clone(), p)
+        (p.clone(), p, None)
     };
 
     if user_pass.is_empty() && owner_pass.is_empty() {
@@ -103,7 +114,26 @@ pub fn execute(
         bail!("{} file(s) failed", summary.failed);
     }
 
+    if let Some(pw) = generated {
+        announce_generated_password(&pw, dry_run);
+    }
+
     Ok(())
+}
+
+fn announce_generated_password(password: &str, dry_run: bool) {
+    eprintln!();
+    eprintln!("Generated password: {password}");
+    if dry_run {
+        eprintln!("(dry-run: clipboard not updated)");
+        return;
+    }
+    match copy_to_clipboard(password) {
+        Ok(()) => eprintln!("✓ Copied to clipboard. Save it now — it will not be shown again."),
+        Err(e) => {
+            eprintln!("! Could not copy to clipboard: {e}\n  Save the password above manually.")
+        }
+    }
 }
 
 fn lock_single(
@@ -127,7 +157,10 @@ fn lock_single(
         permissions: *permissions,
     };
 
-    debug!("Permissions: print={}, copy={}, edit={}", permissions.allow_print, permissions.allow_copy, permissions.allow_edit);
+    debug!(
+        "Permissions: print={}, copy={}, edit={}",
+        permissions.allow_print, permissions.allow_copy, permissions.allow_edit
+    );
     info!("Encrypting with AES-256 R6");
     writer::encrypt_pdf(&mut doc, &params)?;
 

@@ -1,6 +1,31 @@
 use anyhow::{bail, Result};
+use rand::RngExt;
 use std::io::{self, BufRead, IsTerminal};
 use std::process;
+
+const GENERATED_PASSWORD_LEN: usize = 24;
+const GENERATED_PASSWORD_ALPHABET: &[u8] =
+    b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+pub fn generate_password() -> String {
+    let mut bytes = vec![0u8; GENERATED_PASSWORD_LEN];
+    rand::rng().fill(bytes.as_mut_slice());
+    bytes
+        .into_iter()
+        .map(|b| {
+            GENERATED_PASSWORD_ALPHABET[b as usize % GENERATED_PASSWORD_ALPHABET.len()] as char
+        })
+        .collect()
+}
+
+pub fn copy_to_clipboard(value: &str) -> Result<()> {
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|e| anyhow::anyhow!("Failed to access clipboard: {e}"))?;
+    clipboard
+        .set_text(value.to_string())
+        .map_err(|e| anyhow::anyhow!("Failed to write to clipboard: {e}"))?;
+    Ok(())
+}
 
 fn read_password_stdin() -> Result<String> {
     let stdin = io::stdin();
@@ -65,11 +90,7 @@ pub fn read_password_cmd(cmd: &str) -> Result<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Command exited with {}: {}",
-            output.status,
-            stderr.trim()
-        );
+        bail!("Command exited with {}: {}", output.status, stderr.trim());
     }
 
     let password = String::from_utf8(output.stdout)
@@ -106,7 +127,9 @@ pub fn resolve_password(
     if password.is_some() || io::stdin().is_terminal() {
         return prompt_password_interactive("Enter password: ");
     }
-    bail!("No password provided. Use --password, --password-stdin, --password-env, or --password-cmd")
+    bail!(
+        "No password provided. Use --password, --password-stdin, --password-env, or --password-cmd"
+    )
 }
 
 pub fn resolve_old_new_passwords(

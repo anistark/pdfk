@@ -126,6 +126,12 @@ publish TITLE="": build-release
 
     echo "✓ Released v{{ version }} to crates.io and GitHub"
 
+# Generate man pages into ./man
+man:
+    cargo build
+    ./target/debug/pdfk generate-man ./man
+    @echo "Man pages written to ./man/"
+
 # Clean build artifacts
 clean:
     cargo clean

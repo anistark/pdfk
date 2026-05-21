@@ -4,5 +4,8 @@ plan/
 .pi
 .DS_Store
 
+# Generated man pages
+/man
+
 # Added by cargo
 /target

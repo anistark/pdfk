@@ -87,11 +87,7 @@ pub fn execute(files: Vec<PathBuf>, json: bool, recursive: bool) -> Result<()> {
     }
 
     if stats.unencrypted > 0 || stats.errors > 0 {
-        bail!(
-            "{} unencrypted, {} errors",
-            stats.unencrypted,
-            stats.errors
-        );
+        bail!("{} unencrypted, {} errors", stats.unencrypted, stats.errors);
     }
 
     Ok(())
@@ -222,9 +218,9 @@ fn print_table(entries: &[AuditEntry]) {
         };
 
         let encrypted_colored = if entry.encrypted {
-            format!("{:^9}", encrypted_str).green().to_string()
+            format!("{encrypted_str:^9}").green().to_string()
         } else {
-            format!("{:^9}", encrypted_str).red().to_string()
+            format!("{encrypted_str:^9}").red().to_string()
         };
 
         print_status(&format!(

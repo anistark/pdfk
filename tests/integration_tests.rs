@@ -152,6 +152,92 @@ fn test_lock_password_stdin() {
         .success();
 }
 
+#[test]
+fn test_lock_generate_password_outputs_password_and_locks_file() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    let assert = pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--generate-password",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Generated password:"));
+
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
+    let password = stderr
+        .lines()
+        .find_map(|l| l.strip_prefix("Generated password: "))
+        .expect("expected a Generated password line")
+        .trim()
+        .to_string();
+
+    assert_eq!(password.len(), 24);
+    assert!(password.chars().all(|c| c.is_ascii_alphanumeric()));
+    assert!(output.exists());
+
+    pdfk()
+        .args(&["check", output.to_str().unwrap(), "--password", &password])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_lock_generate_password_dry_run_skips_clipboard() {
+    let tmp = TempDir::new().unwrap();
+    let output = tmp.path().join("encrypted.pdf");
+
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--generate-password",
+            "--dry-run",
+            "--output",
+            output.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Generated password:"))
+        .stderr(predicate::str::contains("dry-run: clipboard not updated"));
+
+    assert!(!output.exists());
+}
+
+#[test]
+fn test_lock_generate_password_conflicts_with_password() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--generate-password",
+            "--password",
+            "manual",
+        ])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_lock_generate_password_conflicts_with_user_password() {
+    pdfk()
+        .args(&[
+            "lock",
+            &sample_pdf(),
+            "--generate-password",
+            "--user-password",
+            "manual",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--generate-password"));
+}
+
 // ==================== Unlock tests ====================
 
 #[test]
@@ -1401,7 +1487,12 @@ fn test_lock_password_env() {
         .stderr(predicate::str::contains("Encrypted"));
 
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", "envpass123"])
+        .args(&[
+            "check",
+            output.to_str().unwrap(),
+            "--password",
+            "envpass123",
+        ])
         .assert()
         .success();
 }
@@ -1487,12 +1578,7 @@ fn test_password_env_not_set() {
 #[test]
 fn test_password_env_empty() {
     pdfk()
-        .args(&[
-            "lock",
-            &sample_pdf(),
-            "--password-env",
-            "PDFK_EMPTY_VAR",
-        ])
+        .args(&["lock", &sample_pdf(), "--password-env", "PDFK_EMPTY_VAR"])
         .env("PDFK_EMPTY_VAR", "")
         .assert()
         .failure()
@@ -1518,7 +1604,12 @@ fn test_lock_password_cmd() {
         .stderr(predicate::str::contains("Encrypted"));
 
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", "cmdpass456"])
+        .args(&[
+            "check",
+            output.to_str().unwrap(),
+            "--password",
+            "cmdpass456",
+        ])
         .assert()
         .success();
 }
@@ -1587,12 +1678,7 @@ fn test_check_password_cmd() {
 #[test]
 fn test_password_cmd_failure() {
     pdfk()
-        .args(&[
-            "lock",
-            &sample_pdf(),
-            "--password-cmd",
-            "false",
-        ])
+        .args(&["lock", &sample_pdf(), "--password-cmd", "false"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Command exited with"));
@@ -1634,7 +1720,12 @@ fn test_change_password_env() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "newenvpass"])
+        .args(&[
+            "check",
+            changed.to_str().unwrap(),
+            "--password",
+            "newenvpass",
+        ])
         .assert()
         .success();
 }
@@ -1673,7 +1764,12 @@ fn test_change_password_cmd() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "newcmdpass"])
+        .args(&[
+            "check",
+            changed.to_str().unwrap(),
+            "--password",
+            "newcmdpass",
+        ])
         .assert()
         .success();
 }
@@ -1763,12 +1859,7 @@ fn test_unlock_help_shows_env_cmd_flags() {
 #[test]
 fn test_password_cmd_empty_output() {
     pdfk()
-        .args(&[
-            "lock",
-            &sample_pdf(),
-            "--password-cmd",
-            "printf ''",
-        ])
+        .args(&["lock", &sample_pdf(), "--password-cmd", "printf ''"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("empty"));
@@ -2240,10 +2331,7 @@ fn test_verbose_unlock_shows_details() {
         ])
         .assert()
         .success()
-        .stderr(
-            predicate::str::contains("Loading")
-                .and(predicate::str::contains("Decrypting")),
-        );
+        .stderr(predicate::str::contains("Loading").and(predicate::str::contains("Decrypting")));
 }
 
 #[test]
@@ -2259,10 +2347,7 @@ fn test_verbose_check_shows_details() {
         .args(&["--verbose", "check", &pdf_path, "--password", "pass"])
         .assert()
         .success()
-        .stderr(
-            predicate::str::contains("Loading")
-                .and(predicate::str::contains("Verifying")),
-        );
+        .stderr(predicate::str::contains("Loading").and(predicate::str::contains("Verifying")));
 }
 
 #[test]
@@ -2330,8 +2415,7 @@ fn test_debug_check_shows_encryption_details() {
         .assert()
         .success()
         .stderr(
-            predicate::str::contains("Encryption dict")
-                .and(predicate::str::contains("Key length")),
+            predicate::str::contains("Encryption dict").and(predicate::str::contains("Key length")),
         );
 }
 

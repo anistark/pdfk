@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod change_password;
 pub mod check;
+pub mod generate_man;
 pub mod info;
 pub mod lock;
 pub mod unlock;
@@ -16,6 +17,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_stdin,
             password_env,
             password_cmd,
+            generate_password,
             user_password,
             owner_password,
             no_print,
@@ -31,6 +33,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_stdin,
             password_env,
             password_cmd,
+            generate_password,
             user_password,
             owner_password,
             no_print,
@@ -106,6 +109,14 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_env,
             password_cmd,
             recursive,
-        } => check::execute(files, password, password_stdin, password_env, password_cmd, recursive),
+        } => check::execute(
+            files,
+            password,
+            password_stdin,
+            password_env,
+            password_cmd,
+            recursive,
+        ),
+        Command::GenerateMan { out_dir } => generate_man::execute(out_dir),
     }
 }
