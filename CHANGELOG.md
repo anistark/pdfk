@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `colored` 3.0
 - Added `log` 0.4
 - Added `env_logger` 0.11
+- Added `clap_mangen` 0.2
+
+### Tools
+- **Man page generation**: Run `just man` to generate roff man pages into `./man/` — produces `pdfk.1` plus one page per subcommand (`pdfk-lock.1`, `pdfk-unlock.1`, etc.)
 
 
 

@@ -210,6 +210,14 @@ pub enum Command {
         recursive: bool,
     },
 
+    /// Generate man pages to a directory
+    #[command(hide = true)]
+    GenerateMan {
+        /// Output directory for man pages
+        #[arg(default_value = "man")]
+        out_dir: PathBuf,
+    },
+
     /// Verify a password works without modifying the file
     Check {
         /// Input PDF file(s), folders, or glob patterns
