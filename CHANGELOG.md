@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased](https://github.com/anistark/pdfk/compare/v0.3.0...HEAD)
 
 ### Added
+- **`pdfk completions <shell>` command**: Generate a shell completion script and print it to stdout
+  - Supports `bash`, `zsh`, `fish`, `elvish`, and `powershell` (via `clap_complete`)
+  - `--help` shows ready-to-run install commands for the common shells
 - **`--generate-password` flag on `lock`**: Generate a strong 24-character random password and copy it to the clipboard
   - Uses an unambiguous alphabet (no `0/O/I/l/1`) for share-friendliness
   - Cross-platform clipboard via `arboard` (macOS, Linux, Windows)
@@ -41,9 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `log` 0.4
 - Added `env_logger` 0.11
 - Added `clap_mangen` 0.2
+- Added `clap_complete` 4.6
 
 ### Tools
 - **Man page generation**: Run `just man` to generate roff man pages into `./man/` — produces `pdfk.1` plus one page per subcommand (`pdfk-lock.1`, `pdfk-unlock.1`, etc.)
+- **Shell completion generation**: Run `just completions` to generate bash/zsh/fish completion scripts into `./completions/`
 
 
 

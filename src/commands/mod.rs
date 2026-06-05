@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod change_password;
 pub mod check;
+pub mod completions;
 pub mod generate_man;
 pub mod info;
 pub mod lock;
@@ -118,5 +119,6 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             recursive,
         ),
         Command::GenerateMan { out_dir } => generate_man::execute(out_dir),
+        Command::Completions { shell } => completions::execute(shell),
     }
 }
