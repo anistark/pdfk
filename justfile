@@ -22,7 +22,7 @@ format-check:
 
 # Run clippy lints
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # Type-check without building
 check:

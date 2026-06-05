@@ -46,10 +46,8 @@ fn create_sample_pdf(path: &str) {
         "Count" => 1,
     });
 
-    if let Ok(page) = doc.get_object_mut(page_id) {
-        if let Object::Dictionary(ref mut dict) = page {
-            dict.set("Parent", Object::Reference(pages_id));
-        }
+    if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(page_id) {
+        dict.set("Parent", Object::Reference(pages_id));
     }
 
     let catalog_id = doc.add_object(dictionary! {
