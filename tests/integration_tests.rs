@@ -30,7 +30,7 @@ fn test_lock_creates_encrypted_file() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -52,7 +52,7 @@ fn test_lock_default_output_adds_suffix() {
     let expected_output = tmp.path().join("sample_locked.pdf");
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "testpass"])
+        .args(["lock", &pdf_path, "--password", "testpass"])
         .assert()
         .success();
 
@@ -65,7 +65,7 @@ fn test_lock_in_place() {
     let original_size = fs::metadata(&pdf_path).unwrap().len();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "testpass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "testpass", "--in-place"])
         .assert()
         .success();
 
@@ -80,7 +80,7 @@ fn test_lock_with_separate_passwords() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--user-password",
@@ -95,13 +95,13 @@ fn test_lock_with_separate_passwords() {
 
     // Verify user password works
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", "userpass"])
+        .args(["check", output.to_str().unwrap(), "--password", "userpass"])
         .assert()
         .success();
 
     // Verify owner password works
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", "ownerpass"])
+        .args(["check", output.to_str().unwrap(), "--password", "ownerpass"])
         .assert()
         .success();
 }
@@ -112,7 +112,7 @@ fn test_lock_with_permission_flags() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -134,7 +134,7 @@ fn test_lock_password_stdin() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password-stdin",
@@ -147,7 +147,7 @@ fn test_lock_password_stdin() {
 
     // Verify the stdin password works
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", "stdinpass"])
+        .args(["check", output.to_str().unwrap(), "--password", "stdinpass"])
         .assert()
         .success();
 }
@@ -158,7 +158,7 @@ fn test_lock_generate_password_outputs_password_and_locks_file() {
     let output = tmp.path().join("encrypted.pdf");
 
     let assert = pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--generate-password",
@@ -182,7 +182,7 @@ fn test_lock_generate_password_outputs_password_and_locks_file() {
     assert!(output.exists());
 
     pdfk()
-        .args(&["check", output.to_str().unwrap(), "--password", &password])
+        .args(["check", output.to_str().unwrap(), "--password", &password])
         .assert()
         .success();
 }
@@ -193,7 +193,7 @@ fn test_lock_generate_password_dry_run_skips_clipboard() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--generate-password",
@@ -212,7 +212,7 @@ fn test_lock_generate_password_dry_run_skips_clipboard() {
 #[test]
 fn test_lock_generate_password_conflicts_with_password() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--generate-password",
@@ -226,7 +226,7 @@ fn test_lock_generate_password_conflicts_with_password() {
 #[test]
 fn test_lock_generate_password_conflicts_with_user_password() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--generate-password",
@@ -248,7 +248,7 @@ fn test_unlock_decrypts_file() {
 
     // First encrypt
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -261,7 +261,7 @@ fn test_unlock_decrypts_file() {
 
     // Then decrypt
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password",
@@ -282,7 +282,7 @@ fn test_unlock_wrong_password() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -294,7 +294,7 @@ fn test_unlock_wrong_password() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password",
@@ -308,7 +308,7 @@ fn test_unlock_wrong_password() {
 #[test]
 fn test_unlock_not_encrypted() {
     pdfk()
-        .args(&["unlock", &sample_pdf(), "--password", "testpass"])
+        .args(["unlock", &sample_pdf(), "--password", "testpass"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("not encrypted"));
@@ -321,7 +321,7 @@ fn test_unlock_password_stdin() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -333,7 +333,7 @@ fn test_unlock_password_stdin() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password-stdin",
@@ -353,7 +353,7 @@ fn test_check_correct_password() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -365,7 +365,7 @@ fn test_check_correct_password() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password",
@@ -382,7 +382,7 @@ fn test_check_wrong_password() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -394,7 +394,7 @@ fn test_check_wrong_password() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password",
@@ -408,7 +408,7 @@ fn test_check_wrong_password() {
 #[test]
 fn test_check_not_encrypted() {
     pdfk()
-        .args(&["check", &sample_pdf(), "--password", "testpass"])
+        .args(["check", &sample_pdf(), "--password", "testpass"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("not encrypted"));
@@ -423,7 +423,7 @@ fn test_change_password() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -435,7 +435,7 @@ fn test_change_password() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old",
@@ -451,13 +451,13 @@ fn test_change_password() {
 
     // Old password should not work
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "oldpass"])
+        .args(["check", changed.to_str().unwrap(), "--password", "oldpass"])
         .assert()
         .failure();
 
     // New password should work
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "newpass"])
+        .args(["check", changed.to_str().unwrap(), "--password", "newpass"])
         .assert()
         .success();
 }
@@ -469,7 +469,7 @@ fn test_change_password_stdin() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -481,7 +481,7 @@ fn test_change_password_stdin() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--password-stdin",
@@ -493,7 +493,7 @@ fn test_change_password_stdin() {
         .success();
 
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "newpass"])
+        .args(["check", changed.to_str().unwrap(), "--password", "newpass"])
         .assert()
         .success();
 }
@@ -504,7 +504,7 @@ fn test_change_password_wrong_old() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -516,7 +516,7 @@ fn test_change_password_wrong_old() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old",
@@ -534,7 +534,7 @@ fn test_change_password_wrong_old() {
 #[test]
 fn test_info_unencrypted() {
     pdfk()
-        .args(&["info", &sample_pdf()])
+        .args(["info", &sample_pdf()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -546,7 +546,7 @@ fn test_info_encrypted() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -558,7 +558,7 @@ fn test_info_encrypted() {
         .success();
 
     pdfk()
-        .args(&["info", encrypted.to_str().unwrap()])
+        .args(["info", encrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted:    yes"))
@@ -577,7 +577,7 @@ fn test_info_encrypted_with_permissions() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -591,7 +591,7 @@ fn test_info_encrypted_with_permissions() {
         .success();
 
     pdfk()
-        .args(&["info", encrypted.to_str().unwrap()])
+        .args(["info", encrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Print: denied"))
@@ -602,7 +602,7 @@ fn test_info_encrypted_with_permissions() {
 #[test]
 fn test_info_json_unencrypted() {
     let output = pdfk()
-        .args(&["info", &sample_pdf(), "--json"])
+        .args(["info", &sample_pdf(), "--json"])
         .assert()
         .success()
         .get_output()
@@ -621,7 +621,7 @@ fn test_info_json_encrypted() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -634,7 +634,7 @@ fn test_info_json_encrypted() {
         .success();
 
     let output = pdfk()
-        .args(&["info", encrypted.to_str().unwrap(), "--json"])
+        .args(["info", encrypted.to_str().unwrap(), "--json"])
         .assert()
         .success()
         .get_output()
@@ -655,7 +655,7 @@ fn test_info_json_encrypted() {
 #[test]
 fn test_info_file_not_found() {
     pdfk()
-        .args(&["info", "nonexistent.pdf"])
+        .args(["info", "nonexistent.pdf"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("File not found"));
@@ -666,7 +666,7 @@ fn test_info_file_not_found() {
 #[test]
 fn test_info_rc4_128_fixture() {
     pdfk()
-        .args(&["info", "tests/fixtures/sample_rc4_128.pdf"])
+        .args(["info", "tests/fixtures/sample_rc4_128.pdf"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted:    yes"))
@@ -678,7 +678,7 @@ fn test_info_rc4_128_fixture() {
 #[test]
 fn test_info_aes_128_fixture() {
     pdfk()
-        .args(&["info", "tests/fixtures/sample_aes_128.pdf"])
+        .args(["info", "tests/fixtures/sample_aes_128.pdf"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted:    yes"))
@@ -691,7 +691,7 @@ fn test_info_aes_128_fixture() {
 #[test]
 fn test_info_aes_256_r5_fixture() {
     pdfk()
-        .args(&["info", "tests/fixtures/sample_aes_256_r5.pdf"])
+        .args(["info", "tests/fixtures/sample_aes_256_r5.pdf"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted:    yes"))
@@ -704,7 +704,7 @@ fn test_info_aes_256_r5_fixture() {
 #[test]
 fn test_check_rc4_128_fixture() {
     pdfk()
-        .args(&[
+        .args([
             "check",
             "tests/fixtures/sample_rc4_128.pdf",
             "--password",
@@ -718,7 +718,7 @@ fn test_check_rc4_128_fixture() {
 #[test]
 fn test_check_aes_128_fixture() {
     pdfk()
-        .args(&[
+        .args([
             "check",
             "tests/fixtures/sample_aes_128.pdf",
             "--password",
@@ -732,7 +732,7 @@ fn test_check_aes_128_fixture() {
 #[test]
 fn test_check_aes_256_r5_fixture() {
     pdfk()
-        .args(&[
+        .args([
             "check",
             "tests/fixtures/sample_aes_256_r5.pdf",
             "--password",
@@ -749,7 +749,7 @@ fn test_unlock_rc4_128_fixture() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             "tests/fixtures/sample_rc4_128.pdf",
             "--password",
@@ -763,7 +763,7 @@ fn test_unlock_rc4_128_fixture() {
 
     // Verify decrypted file is not encrypted
     pdfk()
-        .args(&["info", decrypted.to_str().unwrap()])
+        .args(["info", decrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -775,7 +775,7 @@ fn test_unlock_aes_128_fixture() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             "tests/fixtures/sample_aes_128.pdf",
             "--password",
@@ -788,7 +788,7 @@ fn test_unlock_aes_128_fixture() {
         .stderr(predicate::str::contains("Decrypted"));
 
     pdfk()
-        .args(&["info", decrypted.to_str().unwrap()])
+        .args(["info", decrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -800,7 +800,7 @@ fn test_unlock_aes_256_r5_fixture() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             "tests/fixtures/sample_aes_256_r5.pdf",
             "--password",
@@ -813,7 +813,7 @@ fn test_unlock_aes_256_r5_fixture() {
         .stderr(predicate::str::contains("Decrypted"));
 
     pdfk()
-        .args(&["info", decrypted.to_str().unwrap()])
+        .args(["info", decrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -822,7 +822,7 @@ fn test_unlock_aes_256_r5_fixture() {
 #[test]
 fn test_info_json_rc4_128_fixture() {
     let output = pdfk()
-        .args(&["info", "tests/fixtures/sample_rc4_128.pdf", "--json"])
+        .args(["info", "tests/fixtures/sample_rc4_128.pdf", "--json"])
         .assert()
         .success()
         .get_output()
@@ -839,7 +839,7 @@ fn test_info_json_rc4_128_fixture() {
 #[test]
 fn test_info_json_aes_128_fixture() {
     let output = pdfk()
-        .args(&["info", "tests/fixtures/sample_aes_128.pdf", "--json"])
+        .args(["info", "tests/fixtures/sample_aes_128.pdf", "--json"])
         .assert()
         .success()
         .get_output()
@@ -857,7 +857,7 @@ fn test_info_json_aes_128_fixture() {
 #[test]
 fn test_info_json_aes_256_r5_fixture() {
     let output = pdfk()
-        .args(&["info", "tests/fixtures/sample_aes_256_r5.pdf", "--json"])
+        .args(["info", "tests/fixtures/sample_aes_256_r5.pdf", "--json"])
         .assert()
         .success()
         .get_output()
@@ -877,7 +877,7 @@ fn test_info_json_aes_256_r5_fixture() {
 #[test]
 fn test_file_not_found() {
     pdfk()
-        .args(&["lock", "nonexistent.pdf", "--password", "test"])
+        .args(["lock", "nonexistent.pdf", "--password", "test"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("File not found"));
@@ -890,7 +890,7 @@ fn test_invalid_pdf_file() {
     fs::write(&bad_file, "not a pdf file").unwrap();
 
     pdfk()
-        .args(&["lock", bad_file.to_str().unwrap(), "--password", "test"])
+        .args(["lock", bad_file.to_str().unwrap(), "--password", "test"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Failed to load PDF"));
@@ -902,7 +902,7 @@ fn test_already_encrypted() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -914,7 +914,7 @@ fn test_already_encrypted() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             encrypted.to_str().unwrap(),
             "--password",
@@ -927,7 +927,7 @@ fn test_already_encrypted() {
 
 #[test]
 fn test_no_password_provided() {
-    pdfk().args(&["lock", &sample_pdf()]).assert().failure();
+    pdfk().args(["lock", &sample_pdf()]).assert().failure();
 }
 
 // ==================== Full roundtrip test ====================
@@ -941,7 +941,7 @@ fn test_full_roundtrip_lock_check_unlock() {
 
     // Lock
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -954,19 +954,19 @@ fn test_full_roundtrip_lock_check_unlock() {
 
     // Check with correct password
     pdfk()
-        .args(&["check", encrypted.to_str().unwrap(), "--password", password])
+        .args(["check", encrypted.to_str().unwrap(), "--password", password])
         .assert()
         .success();
 
     // Check with wrong password
     pdfk()
-        .args(&["check", encrypted.to_str().unwrap(), "--password", "wrong"])
+        .args(["check", encrypted.to_str().unwrap(), "--password", "wrong"])
         .assert()
         .failure();
 
     // Unlock
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password",
@@ -979,7 +979,7 @@ fn test_full_roundtrip_lock_check_unlock() {
 
     // Decrypted file should not be encrypted
     pdfk()
-        .args(&[
+        .args([
             "check",
             decrypted.to_str().unwrap(),
             "--password",
@@ -1003,7 +1003,7 @@ fn test_lock_multiple_files() {
     fs::copy(sample_pdf(), &pdf3).unwrap();
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1019,7 +1019,7 @@ fn test_lock_multiple_files() {
     // All three should now be encrypted
     for pdf in [&pdf1, &pdf2, &pdf3] {
         pdfk()
-            .args(&["check", pdf.to_str().unwrap(), "--password", "testpass"])
+            .args(["check", pdf.to_str().unwrap(), "--password", "testpass"])
             .assert()
             .success();
     }
@@ -1035,7 +1035,7 @@ fn test_unlock_multiple_files() {
 
     // Lock both first
     pdfk()
-        .args(&[
+        .args([
             "lock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1048,7 +1048,7 @@ fn test_unlock_multiple_files() {
 
     // Unlock both
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1063,7 +1063,7 @@ fn test_unlock_multiple_files() {
     // Both should now be unencrypted
     for pdf in [&pdf1, &pdf2] {
         pdfk()
-            .args(&["info", pdf.to_str().unwrap()])
+            .args(["info", pdf.to_str().unwrap()])
             .assert()
             .success()
             .stdout(predicate::str::contains("Encrypted: no"));
@@ -1079,7 +1079,7 @@ fn test_check_multiple_files() {
     fs::copy(sample_pdf(), &pdf2).unwrap();
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1091,7 +1091,7 @@ fn test_check_multiple_files() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1106,7 +1106,7 @@ fn test_check_multiple_files() {
 #[test]
 fn test_info_multiple_files() {
     pdfk()
-        .args(&[
+        .args([
             "info",
             "tests/fixtures/sample.pdf",
             "tests/fixtures/sample_rc4_128.pdf",
@@ -1129,7 +1129,7 @@ fn test_lock_folder() {
     fs::copy(sample_pdf(), subdir.join("b.pdf")).unwrap();
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             subdir.to_str().unwrap(),
             "--password",
@@ -1142,7 +1142,7 @@ fn test_lock_folder() {
 
     // Both should be encrypted
     pdfk()
-        .args(&[
+        .args([
             "check",
             subdir.join("a.pdf").to_str().unwrap(),
             "--password",
@@ -1151,7 +1151,7 @@ fn test_lock_folder() {
         .assert()
         .success();
     pdfk()
-        .args(&[
+        .args([
             "check",
             subdir.join("b.pdf").to_str().unwrap(),
             "--password",
@@ -1172,7 +1172,7 @@ fn test_lock_folder_recursive() {
 
     // Without --recursive, only top-level files are processed
     pdfk()
-        .args(&[
+        .args([
             "lock",
             root.to_str().unwrap(),
             "--password",
@@ -1185,7 +1185,7 @@ fn test_lock_folder_recursive() {
 
     // Verify the nested file was NOT processed
     pdfk()
-        .args(&["info", sub.join("nested.pdf").to_str().unwrap()])
+        .args(["info", sub.join("nested.pdf").to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -1195,7 +1195,7 @@ fn test_lock_folder_recursive() {
 
     // With --recursive, both are processed
     pdfk()
-        .args(&[
+        .args([
             "lock",
             root.to_str().unwrap(),
             "--password",
@@ -1208,7 +1208,7 @@ fn test_lock_folder_recursive() {
         .stderr(predicate::str::contains("2 succeeded, 0 failed, 0 skipped"));
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             sub.join("nested.pdf").to_str().unwrap(),
             "--password",
@@ -1223,14 +1223,14 @@ fn test_dry_run_lock() {
     let (_tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "testpass", "--dry-run"])
+        .args(["lock", &pdf_path, "--password", "testpass", "--dry-run"])
         .assert()
         .success()
         .stderr(predicate::str::contains("[dry-run] Would encrypt"));
 
     // File should NOT be encrypted
     pdfk()
-        .args(&["info", &pdf_path])
+        .args(["info", &pdf_path])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted: no"));
@@ -1242,7 +1242,7 @@ fn test_dry_run_unlock() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1254,7 +1254,7 @@ fn test_dry_run_unlock() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password",
@@ -1267,7 +1267,7 @@ fn test_dry_run_unlock() {
 
     // File should still be encrypted
     pdfk()
-        .args(&["info", encrypted.to_str().unwrap()])
+        .args(["info", encrypted.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypted:    yes"));
@@ -1281,7 +1281,7 @@ fn test_batch_partial_failure() {
 
     // Create an encrypted file
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1297,7 +1297,7 @@ fn test_batch_partial_failure() {
 
     // Try to unlock both — the unencrypted one should fail
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             unencrypted.to_str().unwrap(),
@@ -1319,7 +1319,7 @@ fn test_output_not_allowed_with_multiple_files() {
     fs::copy(sample_pdf(), &pdf2).unwrap();
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1339,7 +1339,7 @@ fn test_output_not_allowed_with_multiple_files() {
 fn test_info_folder() {
     // Info on the fixtures directory
     pdfk()
-        .args(&["info", "tests/fixtures"])
+        .args(["info", "tests/fixtures"])
         .assert()
         .success()
         .stderr(predicate::str::contains("succeeded"));
@@ -1355,7 +1355,7 @@ fn test_change_password_multiple_files() {
 
     // Lock both
     pdfk()
-        .args(&[
+        .args([
             "lock",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1368,7 +1368,7 @@ fn test_change_password_multiple_files() {
 
     // Change password on both
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             pdf1.to_str().unwrap(),
             pdf2.to_str().unwrap(),
@@ -1385,7 +1385,7 @@ fn test_change_password_multiple_files() {
     // Verify new password works on both
     for pdf in [&pdf1, &pdf2] {
         pdfk()
-            .args(&["check", pdf.to_str().unwrap(), "--password", "newpass"])
+            .args(["check", pdf.to_str().unwrap(), "--password", "newpass"])
             .assert()
             .success();
     }
@@ -1397,7 +1397,7 @@ fn test_dry_run_change_password() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1409,7 +1409,7 @@ fn test_dry_run_change_password() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old",
@@ -1424,7 +1424,7 @@ fn test_dry_run_change_password() {
 
     // Password should still be the old one
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password",
@@ -1459,7 +1459,7 @@ fn test_version() {
 #[test]
 fn test_subcommand_help() {
     pdfk()
-        .args(&["lock", "--help"])
+        .args(["lock", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Encrypt a PDF"));
@@ -1520,7 +1520,7 @@ fn test_lock_password_env() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password-env",
@@ -1534,7 +1534,7 @@ fn test_lock_password_env() {
         .stderr(predicate::str::contains("Encrypted"));
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             output.to_str().unwrap(),
             "--password",
@@ -1551,7 +1551,7 @@ fn test_unlock_password_env() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1563,7 +1563,7 @@ fn test_unlock_password_env() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password-env",
@@ -1583,7 +1583,7 @@ fn test_check_password_env() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1595,7 +1595,7 @@ fn test_check_password_env() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password-env",
@@ -1610,7 +1610,7 @@ fn test_check_password_env() {
 #[test]
 fn test_password_env_not_set() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password-env",
@@ -1625,7 +1625,7 @@ fn test_password_env_not_set() {
 #[test]
 fn test_password_env_empty() {
     pdfk()
-        .args(&["lock", &sample_pdf(), "--password-env", "PDFK_EMPTY_VAR"])
+        .args(["lock", &sample_pdf(), "--password-env", "PDFK_EMPTY_VAR"])
         .env("PDFK_EMPTY_VAR", "")
         .assert()
         .failure()
@@ -1638,7 +1638,7 @@ fn test_lock_password_cmd() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password-cmd",
@@ -1651,7 +1651,7 @@ fn test_lock_password_cmd() {
         .stderr(predicate::str::contains("Encrypted"));
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             output.to_str().unwrap(),
             "--password",
@@ -1668,7 +1668,7 @@ fn test_unlock_password_cmd() {
     let decrypted = tmp.path().join("decrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1680,7 +1680,7 @@ fn test_unlock_password_cmd() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "unlock",
             encrypted.to_str().unwrap(),
             "--password-cmd",
@@ -1699,7 +1699,7 @@ fn test_check_password_cmd() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1711,7 +1711,7 @@ fn test_check_password_cmd() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password-cmd",
@@ -1725,7 +1725,7 @@ fn test_check_password_cmd() {
 #[test]
 fn test_password_cmd_failure() {
     pdfk()
-        .args(&["lock", &sample_pdf(), "--password-cmd", "false"])
+        .args(["lock", &sample_pdf(), "--password-cmd", "false"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Command exited with"));
@@ -1738,7 +1738,7 @@ fn test_change_password_env() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1750,7 +1750,7 @@ fn test_change_password_env() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old-env",
@@ -1767,7 +1767,7 @@ fn test_change_password_env() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             changed.to_str().unwrap(),
             "--password",
@@ -1784,7 +1784,7 @@ fn test_change_password_cmd() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1796,7 +1796,7 @@ fn test_change_password_cmd() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old-cmd",
@@ -1811,7 +1811,7 @@ fn test_change_password_cmd() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             changed.to_str().unwrap(),
             "--password",
@@ -1828,7 +1828,7 @@ fn test_change_password_mixed_env_cmd() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1840,7 +1840,7 @@ fn test_change_password_mixed_env_cmd() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old-env",
@@ -1856,7 +1856,7 @@ fn test_change_password_mixed_env_cmd() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "mixnew"])
+        .args(["check", changed.to_str().unwrap(), "--password", "mixnew"])
         .assert()
         .success();
 }
@@ -1864,7 +1864,7 @@ fn test_change_password_mixed_env_cmd() {
 #[test]
 fn test_lock_help_shows_env_cmd_flags() {
     pdfk()
-        .args(&["lock", "--help"])
+        .args(["lock", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("--password-env"))
@@ -1874,7 +1874,7 @@ fn test_lock_help_shows_env_cmd_flags() {
 #[test]
 fn test_check_help_shows_env_cmd_flags() {
     pdfk()
-        .args(&["check", "--help"])
+        .args(["check", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("--password-env"))
@@ -1884,7 +1884,7 @@ fn test_check_help_shows_env_cmd_flags() {
 #[test]
 fn test_change_password_help_shows_env_cmd_flags() {
     pdfk()
-        .args(&["change-password", "--help"])
+        .args(["change-password", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("--old-env"))
@@ -1896,7 +1896,7 @@ fn test_change_password_help_shows_env_cmd_flags() {
 #[test]
 fn test_unlock_help_shows_env_cmd_flags() {
     pdfk()
-        .args(&["unlock", "--help"])
+        .args(["unlock", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("--password-env"))
@@ -1906,7 +1906,7 @@ fn test_unlock_help_shows_env_cmd_flags() {
 #[test]
 fn test_password_cmd_empty_output() {
     pdfk()
-        .args(&["lock", &sample_pdf(), "--password-cmd", "printf ''"])
+        .args(["lock", &sample_pdf(), "--password-cmd", "printf ''"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("empty"));
@@ -1918,7 +1918,7 @@ fn test_check_wrong_password_via_env() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1930,7 +1930,7 @@ fn test_check_wrong_password_via_env() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password-env",
@@ -1948,7 +1948,7 @@ fn test_check_wrong_password_via_cmd() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1960,7 +1960,7 @@ fn test_check_wrong_password_via_cmd() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "check",
             encrypted.to_str().unwrap(),
             "--password-cmd",
@@ -1974,7 +1974,7 @@ fn test_check_wrong_password_via_cmd() {
 #[test]
 fn test_password_env_and_password_mutually_exclusive() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -1990,7 +1990,7 @@ fn test_password_env_and_password_mutually_exclusive() {
 #[test]
 fn test_password_cmd_and_password_mutually_exclusive() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2006,7 +2006,7 @@ fn test_password_cmd_and_password_mutually_exclusive() {
 #[test]
 fn test_password_env_and_cmd_mutually_exclusive() {
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password-env",
@@ -2026,7 +2026,7 @@ fn test_change_password_mixed_cmd_env() {
     let changed = tmp.path().join("changed.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2038,7 +2038,7 @@ fn test_change_password_mixed_cmd_env() {
         .success();
 
     pdfk()
-        .args(&[
+        .args([
             "change-password",
             encrypted.to_str().unwrap(),
             "--old-cmd",
@@ -2054,7 +2054,7 @@ fn test_change_password_mixed_cmd_env() {
         .stderr(predicate::str::contains("Password changed"));
 
     pdfk()
-        .args(&["check", changed.to_str().unwrap(), "--password", "envnew"])
+        .args(["check", changed.to_str().unwrap(), "--password", "envnew"])
         .assert()
         .success();
 }
@@ -2064,7 +2064,7 @@ fn test_change_password_mixed_cmd_env() {
 #[test]
 fn test_audit_unencrypted_file() {
     pdfk()
-        .args(&["audit", &sample_pdf()])
+        .args(["audit", &sample_pdf()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("no"))
@@ -2077,7 +2077,7 @@ fn test_audit_encrypted_file() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2089,7 +2089,7 @@ fn test_audit_encrypted_file() {
         .success();
 
     pdfk()
-        .args(&["audit", encrypted.to_str().unwrap()])
+        .args(["audit", encrypted.to_str().unwrap()])
         .assert()
         .success()
         .stderr(predicate::str::contains("yes"))
@@ -2102,7 +2102,7 @@ fn test_audit_mixed_files() {
     let encrypted = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2114,7 +2114,7 @@ fn test_audit_mixed_files() {
         .success();
 
     pdfk()
-        .args(&["audit", &sample_pdf(), encrypted.to_str().unwrap()])
+        .args(["audit", &sample_pdf(), encrypted.to_str().unwrap()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("1 encrypted"))
@@ -2124,7 +2124,7 @@ fn test_audit_mixed_files() {
 #[test]
 fn test_audit_folder() {
     pdfk()
-        .args(&["audit", "tests/fixtures/"])
+        .args(["audit", "tests/fixtures/"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("ENCRYPTED"))
@@ -2140,7 +2140,7 @@ fn test_audit_recursive() {
     fs::copy(sample_pdf(), subdir.join("a.pdf")).unwrap();
 
     pdfk()
-        .args(&["audit", tmp.path().to_str().unwrap(), "--recursive"])
+        .args(["audit", tmp.path().to_str().unwrap(), "--recursive"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("1 unencrypted"));
@@ -2149,7 +2149,7 @@ fn test_audit_recursive() {
 #[test]
 fn test_audit_json_output() {
     pdfk()
-        .args(&["audit", &sample_pdf(), "--json"])
+        .args(["audit", &sample_pdf(), "--json"])
         .assert()
         .failure()
         .stdout(predicate::str::contains("\"encrypted\": false"));
@@ -2161,7 +2161,7 @@ fn test_audit_json_encrypted() {
     let encrypted = tmp.path().join("enc.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2173,7 +2173,7 @@ fn test_audit_json_encrypted() {
         .success();
 
     let output = pdfk()
-        .args(&["audit", encrypted.to_str().unwrap(), "--json"])
+        .args(["audit", encrypted.to_str().unwrap(), "--json"])
         .assert()
         .success()
         .get_output()
@@ -2191,7 +2191,7 @@ fn test_audit_json_encrypted() {
 #[test]
 fn test_audit_file_not_found() {
     pdfk()
-        .args(&["audit", "nonexistent.pdf"])
+        .args(["audit", "nonexistent.pdf"])
         .assert()
         .failure();
 }
@@ -2199,7 +2199,7 @@ fn test_audit_file_not_found() {
 #[test]
 fn test_audit_exit_code_zero_all_encrypted() {
     pdfk()
-        .args(&["audit", "tests/fixtures/sample_locked.pdf"])
+        .args(["audit", "tests/fixtures/sample_locked.pdf"])
         .assert()
         .success();
 }
@@ -2207,7 +2207,7 @@ fn test_audit_exit_code_zero_all_encrypted() {
 #[test]
 fn test_audit_permissions_in_table() {
     pdfk()
-        .args(&["audit", "tests/fixtures/sample_locked.pdf"])
+        .args(["audit", "tests/fixtures/sample_locked.pdf"])
         .assert()
         .success()
         .stderr(predicate::str::contains("✓"));
@@ -2219,7 +2219,7 @@ fn test_audit_with_restricted_permissions() {
     let encrypted = tmp.path().join("restricted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "lock",
             &sample_pdf(),
             "--password",
@@ -2233,7 +2233,7 @@ fn test_audit_with_restricted_permissions() {
         .success();
 
     let output = pdfk()
-        .args(&["audit", encrypted.to_str().unwrap(), "--json"])
+        .args(["audit", encrypted.to_str().unwrap(), "--json"])
         .assert()
         .success()
         .get_output()
@@ -2255,7 +2255,7 @@ fn test_quiet_lock_suppresses_output() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "--quiet",
             "lock",
             &sample_pdf(),
@@ -2276,13 +2276,13 @@ fn test_quiet_unlock_suppresses_output() {
     let (tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "pass", "--in-place"])
         .assert()
         .success();
 
     let unlocked = tmp.path().join("unlocked.pdf");
     pdfk()
-        .args(&[
+        .args([
             "--quiet",
             "unlock",
             &pdf_path,
@@ -2301,12 +2301,12 @@ fn test_quiet_check_suppresses_output() {
     let (_tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "pass", "--in-place"])
         .assert()
         .success();
 
     pdfk()
-        .args(&["--quiet", "check", &pdf_path, "--password", "pass"])
+        .args(["--quiet", "check", &pdf_path, "--password", "pass"])
         .assert()
         .success()
         .stderr(predicate::str::is_empty());
@@ -2315,7 +2315,7 @@ fn test_quiet_check_suppresses_output() {
 #[test]
 fn test_quiet_still_shows_errors() {
     pdfk()
-        .args(&["--quiet", "lock", "nonexistent.pdf", "--password", "pass"])
+        .args(["--quiet", "lock", "nonexistent.pdf", "--password", "pass"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found").or(predicate::str::contains("No such file")));
@@ -2324,7 +2324,7 @@ fn test_quiet_still_shows_errors() {
 #[test]
 fn test_quiet_and_verbose_conflict() {
     pdfk()
-        .args(&["--quiet", "--verbose", "info", &sample_pdf()])
+        .args(["--quiet", "--verbose", "info", &sample_pdf()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
@@ -2338,7 +2338,7 @@ fn test_verbose_lock_shows_details() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "--verbose",
             "lock",
             &sample_pdf(),
@@ -2361,13 +2361,13 @@ fn test_verbose_unlock_shows_details() {
     let (tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "pass", "--in-place"])
         .assert()
         .success();
 
     let unlocked = tmp.path().join("unlocked.pdf");
     pdfk()
-        .args(&[
+        .args([
             "--verbose",
             "unlock",
             &pdf_path,
@@ -2386,12 +2386,12 @@ fn test_verbose_check_shows_details() {
     let (_tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "pass", "--in-place"])
         .assert()
         .success();
 
     pdfk()
-        .args(&["--verbose", "check", &pdf_path, "--password", "pass"])
+        .args(["--verbose", "check", &pdf_path, "--password", "pass"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Loading").and(predicate::str::contains("Verifying")));
@@ -2400,7 +2400,7 @@ fn test_verbose_check_shows_details() {
 #[test]
 fn test_quiet_dry_run_suppresses_output() {
     pdfk()
-        .args(&[
+        .args([
             "--quiet",
             "lock",
             &sample_pdf(),
@@ -2416,7 +2416,7 @@ fn test_quiet_dry_run_suppresses_output() {
 #[test]
 fn test_quiet_audit_suppresses_table() {
     pdfk()
-        .args(&["--quiet", "audit", &sample_pdf()])
+        .args(["--quiet", "audit", &sample_pdf()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("FILE").not());
@@ -2430,7 +2430,7 @@ fn test_debug_lock_shows_debug_details() {
     let output = tmp.path().join("encrypted.pdf");
 
     pdfk()
-        .args(&[
+        .args([
             "--debug",
             "lock",
             &sample_pdf(),
@@ -2453,12 +2453,12 @@ fn test_debug_check_shows_encryption_details() {
     let (_tmp, pdf_path) = copy_sample_to_temp();
 
     pdfk()
-        .args(&["lock", &pdf_path, "--password", "pass", "--in-place"])
+        .args(["lock", &pdf_path, "--password", "pass", "--in-place"])
         .assert()
         .success();
 
     pdfk()
-        .args(&["--debug", "check", &pdf_path, "--password", "pass"])
+        .args(["--debug", "check", &pdf_path, "--password", "pass"])
         .assert()
         .success()
         .stderr(
@@ -2469,7 +2469,7 @@ fn test_debug_check_shows_encryption_details() {
 #[test]
 fn test_debug_and_quiet_conflict() {
     pdfk()
-        .args(&["--quiet", "--debug", "info", &sample_pdf()])
+        .args(["--quiet", "--debug", "info", &sample_pdf()])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));

@@ -23,7 +23,7 @@ fn generate_pages(cmd: &clap::Command, parent: &str, out_dir: &Path) -> Result<(
     let renamed = cmd.clone().name(static_name);
     let mut buf = Vec::new();
     Man::new(renamed.clone()).render(&mut buf)?;
-    std::fs::write(out_dir.join(format!("{}.1", static_name)), &buf)?;
+    std::fs::write(out_dir.join(format!("{static_name}.1")), &buf)?;
 
     for sub in renamed.get_subcommands() {
         if !sub.is_hide_set() {
