@@ -1465,6 +1465,53 @@ fn test_subcommand_help() {
         .stdout(predicate::str::contains("Encrypt a PDF"));
 }
 
+// ==================== Completions tests ====================
+
+#[test]
+fn test_completions_bash() {
+    pdfk()
+        .args(&["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_pdfk").and(predicate::str::contains("complete")));
+}
+
+#[test]
+fn test_completions_zsh() {
+    pdfk()
+        .args(&["completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("#compdef pdfk"));
+}
+
+#[test]
+fn test_completions_fish() {
+    pdfk()
+        .args(&["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete -c pdfk"));
+}
+
+#[test]
+fn test_completions_invalid_shell() {
+    pdfk()
+        .args(&["completions", "tcsh"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value 'tcsh'"));
+}
+
+#[test]
+fn test_completions_help_shows_install_hints() {
+    pdfk()
+        .args(&["completions", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("pdfk completions bash"));
+}
+
 // ==================== Password env/cmd tests ====================
 
 #[test]
