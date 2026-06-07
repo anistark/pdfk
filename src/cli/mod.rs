@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -216,6 +217,17 @@ pub enum Command {
         /// Output directory for man pages
         #[arg(default_value = "man")]
         out_dir: PathBuf,
+    },
+
+    /// Generate a shell completion script
+    #[command(long_about = "Generate a shell completion script and print it to stdout.\n\n\
+        Install (bash):  pdfk completions bash > /etc/bash_completion.d/pdfk\n\
+        Install (zsh):   pdfk completions zsh > \"${fpath[1]}/_pdfk\"\n\
+        Install (fish):  pdfk completions fish > ~/.config/fish/completions/pdfk.fish")]
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
     },
 
     /// Verify a password works without modifying the file

@@ -132,6 +132,15 @@ man:
     ./target/debug/pdfk generate-man ./man
     @echo "Man pages written to ./man/"
 
+# Generate shell completions into ./completions
+completions:
+    cargo build
+    mkdir -p ./completions
+    ./target/debug/pdfk completions bash > ./completions/pdfk.bash
+    ./target/debug/pdfk completions zsh > ./completions/_pdfk
+    ./target/debug/pdfk completions fish > ./completions/pdfk.fish
+    @echo "Completions written to ./completions/"
+
 # Clean build artifacts
 clean:
     cargo clean

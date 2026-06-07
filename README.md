@@ -344,6 +344,21 @@ Output is colored by default (green for success, red for errors). Set the `NO_CO
 NO_COLOR=1 pdfk info document.pdf
 ```
 
+## Shell Completions
+
+Generate completion scripts for your shell with `pdfk completions <shell>` (supports `bash`, `zsh`, `fish`, `elvish`, and `powershell`):
+
+```sh
+# Bash
+pdfk completions bash > /etc/bash_completion.d/pdfk
+
+# Zsh (writes to the first directory in your $fpath)
+pdfk completions zsh > "${fpath[1]}/_pdfk"
+
+# Fish
+pdfk completions fish > ~/.config/fish/completions/pdfk.fish
+```
+
 ## Encryption Support
 
 pdfk encrypts using the strongest available standard and can decrypt all common PDF encryption formats:
