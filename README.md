@@ -196,6 +196,55 @@ if pdfk check file.pdf --password "$PASS" 2>/dev/null; then
 fi
 ```
 
+### `read` — Extract content as text
+
+```sh
+pdfk read document.pdf
+```
+
+Prints the document as **Markdown** by default — `# <file>` and `## Page N`
+headings, with images referenced inline:
+
+```markdown
+# document.pdf
+
+## Page 1
+
+Quarterly results were up 12% year over year.
+
+![Figure 1: revenue by region](#im1) <!-- 1200×800 -->
+```
+
+Choose a different format with `--format`:
+
+```sh
+pdfk read document.pdf --format text   # raw plain text
+pdfk read document.pdf --format json   # structured per-page JSON
+pdfk read document.pdf --json          # shorthand for --format json
+```
+
+Other options:
+
+```sh
+# Write to a file instead of stdout
+pdfk read document.pdf --output notes.md
+
+# Clean, pipe-friendly output (no headings, no image references)
+pdfk read document.pdf --no-headers --no-images
+
+# Read an encrypted PDF
+echo "$PASS" | pdfk read secret.pdf --password-stdin
+
+# Pull just the text of every page for indexing
+pdfk read report.pdf --format json | jq -r '.pages[].text'
+```
+
+The reader is resilient: pages with unsupported fonts or undecodable bytes are
+reported inline (`> ⚠️ …` in Markdown, `[!] …` in text, a `warnings[]` array in
+JSON) rather than aborting the whole document. Images are noted even when no
+text can be extracted (e.g. scanned PDFs); captions come from tagged-PDF
+alternate text when present.
+
 ## Use Cases
 
 ### Protect sensitive documents before sharing

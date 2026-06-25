@@ -5,6 +5,7 @@ pub mod completions;
 pub mod generate_man;
 pub mod info;
 pub mod lock;
+pub mod read;
 pub mod unlock;
 
 use crate::cli::{Cli, Command};
@@ -118,6 +119,37 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_cmd,
             recursive,
         ),
+        Command::Read {
+            files,
+            format,
+            json,
+            output,
+            no_headers,
+            no_images,
+            password,
+            password_stdin,
+            password_env,
+            password_cmd,
+            recursive,
+        } => {
+            let format = if json {
+                crate::cli::ReadFormat::Json
+            } else {
+                format
+            };
+            read::execute(
+                files,
+                format,
+                output,
+                no_headers,
+                no_images,
+                password,
+                password_stdin,
+                password_env,
+                password_cmd,
+                recursive,
+            )
+        }
         Command::GenerateMan { out_dir } => generate_man::execute(out_dir),
         Command::Completions { shell } => completions::execute(shell),
     }

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased](https://github.com/anistark/pdfk/compare/v0.3.0...HEAD)
 
 ### Added
+- **`pdfk read` command**: Extract a PDF's content as Markdown (default), plain text, or JSON
+  - `--format md|text|json` (default `md`); `--json` kept as a shorthand for `--format json`
+  - Markdown output adds `# <file>` / `## Page N` headings, references images as `![caption](#anchor) <!-- W×H -->`, and lightly escapes body text so stray `#`/`-`/`>` don't render as formatting
+  - `--no-headers` for clean pipe-friendly output; `--no-images` to drop image references
+  - Detects image XObjects per page; surfaces tagged-PDF `/Figure` alternate text as captions (best-effort)
+  - Robust extraction: undecodable pages/fonts degrade to inline warnings (`> ⚠️` / `[!]`) instead of aborting the document
+  - Reads encrypted PDFs with the standard password sources (`--password`, `--password-stdin`, `--password-env`, `--password-cmd`); password is only required when a file is actually encrypted
+  - `--output` to write to a file (single input), plus batch/folder/glob and `--recursive` support
 - **`pdfk completions <shell>` command**: Generate a shell completion script and print it to stdout
   - Supports `bash`, `zsh`, `fish`, `elvish`, and `powershell` (via `clap_complete`)
   - `--help` shows ready-to-run install commands for the common shells
@@ -38,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - All human-facing output now routes through a centralized output module (`src/utils/output.rs`) with consistent formatting and verbosity control
+
+### Fixed
+- `clippy::uninlined_format_args` warnings in `generate_man.rs`
 
 ### Dependencies
 - Added `colored` 3.0

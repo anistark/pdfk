@@ -1,6 +1,16 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use std::path::PathBuf;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum ReadFormat {
+    /// Markdown with page headings and image references (default)
+    Md,
+    /// Plain text
+    Text,
+    /// Structured JSON (per-page text, images, warnings)
+    Json,
+}
 
 #[derive(Parser, Debug)]
 #[command(
@@ -220,10 +230,12 @@ pub enum Command {
     },
 
     /// Generate a shell completion script
-    #[command(long_about = "Generate a shell completion script and print it to stdout.\n\n\
+    #[command(
+        long_about = "Generate a shell completion script and print it to stdout.\n\n\
         Install (bash):  pdfk completions bash > /etc/bash_completion.d/pdfk\n\
         Install (zsh):   pdfk completions zsh > \"${fpath[1]}/_pdfk\"\n\
-        Install (fish):  pdfk completions fish > ~/.config/fish/completions/pdfk.fish")]
+        Install (fish):  pdfk completions fish > ~/.config/fish/completions/pdfk.fish"
+    )]
     Completions {
         /// Shell to generate completions for
         #[arg(value_enum)]
@@ -237,6 +249,53 @@ pub enum Command {
         files: Vec<PathBuf>,
 
         /// Password to verify (prompts interactively if value is omitted)
+        #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
+        password: Option<String>,
+
+        /// Read password from stdin
+        #[arg(long, group = "password_source")]
+        password_stdin: bool,
+
+        /// Read password from an environment variable
+        #[arg(long, group = "password_source", value_name = "VAR")]
+        password_env: Option<String>,
+
+        /// Read password from a command's output
+        #[arg(long, group = "password_source", value_name = "CMD")]
+        password_cmd: Option<String>,
+
+        /// Process folders recursively
+        #[arg(short = 'R', long)]
+        recursive: bool,
+    },
+
+    /// Extract a PDF's content as Markdown (default), text, or JSON
+    Read {
+        /// Input PDF file(s), folders, or glob patterns
+        #[arg(required = true, num_args = 1..)]
+        files: Vec<PathBuf>,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "md", conflicts_with = "json")]
+        format: ReadFormat,
+
+        /// Shorthand for --format json
+        #[arg(long, conflicts_with = "format")]
+        json: bool,
+
+        /// Write output to a file instead of stdout (single input only)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Omit the document and page headings
+        #[arg(long)]
+        no_headers: bool,
+
+        /// Omit image references
+        #[arg(long)]
+        no_images: bool,
+
+        /// Password for encrypted PDFs (prompts if value omitted)
         #[arg(short, long, group = "password_source", num_args = 0..=1, default_missing_value = "")]
         password: Option<String>,
 
