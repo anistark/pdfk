@@ -16,7 +16,7 @@ fn generate_pages(cmd: &clap::Command, parent: &str, out_dir: &Path) -> Result<(
     let name = if parent.is_empty() {
         cmd.get_name().to_string()
     } else {
-        format!("{}-{}", parent, cmd.get_name())
+        format!("{parent}-{}", cmd.get_name())
     };
 
     let static_name: &'static str = Box::leak(name.into_boxed_str());

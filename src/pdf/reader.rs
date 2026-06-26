@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use log::debug;
-use lopdf::{Document, Object};
+use lopdf::{Dictionary, Document, Object, ObjectId};
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -170,6 +172,167 @@ fn parse_file_id(doc: &Document) -> Vec<u8> {
         return bytes.clone();
     }
     Vec::new()
+}
+
+/// An image XObject referenced by a page.
+#[derive(Debug, Clone, Serialize)]
+pub struct PageImage {
+    pub name: String,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub caption: Option<String>,
+}
+
+/// List the image XObjects referenced by a page (best-effort, never panics).
+/// Captions are left empty here; see `collect_figure_captions`.
+pub fn list_page_images(doc: &Document, page_id: ObjectId) -> Vec<PageImage> {
+    let mut images = Vec::new();
+    let Ok((resource_dict, resource_ids)) = doc.get_page_resources(page_id) else {
+        return images;
+    };
+    if let Some(dict) = resource_dict {
+        collect_images(doc, dict, &mut images);
+    }
+    for id in resource_ids {
+        if let Ok(dict) = doc.get_dictionary(id) {
+            collect_images(doc, dict, &mut images);
+        }
+    }
+    images
+}
+
+fn collect_images(doc: &Document, resources: &Dictionary, out: &mut Vec<PageImage>) {
+    let Some(xobjects) = resources
+        .get(b"XObject")
+        .ok()
+        .and_then(|o| resolve_dict(doc, o))
+    else {
+        return;
+    };
+    for (name, value) in xobjects.iter() {
+        let Some(dict) = resolve_dict(doc, value) else {
+            continue;
+        };
+        if dict.get(b"Subtype").ok().and_then(|o| o.as_name().ok()) != Some(b"Image".as_slice()) {
+            continue;
+        }
+        out.push(PageImage {
+            name: String::from_utf8_lossy(name).to_string(),
+            width: dict.get(b"Width").ok().and_then(|o| o.as_i64().ok()),
+            height: dict.get(b"Height").ok().and_then(|o| o.as_i64().ok()),
+            caption: None,
+        });
+    }
+}
+
+/// Resolve an object (following a single reference) to a dictionary, treating a
+/// stream as its dictionary.
+fn resolve_dict<'a>(doc: &'a Document, obj: &'a Object) -> Option<&'a Dictionary> {
+    let resolved = match obj {
+        Object::Reference(id) => doc.get_object(*id).ok()?,
+        other => other,
+    };
+    match resolved {
+        Object::Dictionary(d) => Some(d),
+        Object::Stream(s) => Some(&s.dict),
+        _ => None,
+    }
+}
+
+/// Best-effort caption extraction: map each page object id to the alternate text
+/// of any `/Figure` structure elements on it (Tagged PDF only). Returns an empty
+/// map when the document has no structure tree.
+pub fn collect_figure_captions(doc: &Document) -> HashMap<ObjectId, Vec<String>> {
+    let mut map: HashMap<ObjectId, Vec<String>> = HashMap::new();
+    let Some(root) = doc
+        .catalog()
+        .ok()
+        .and_then(|c| c.get(b"StructTreeRoot").ok())
+        .and_then(|o| resolve_dict(doc, o))
+    else {
+        return map;
+    };
+    let mut seen = HashSet::new();
+    if let Ok(kids) = root.get(b"K") {
+        walk_struct_kids(doc, kids, &mut map, &mut seen, 0);
+    }
+    map
+}
+
+fn walk_struct_kids(
+    doc: &Document,
+    obj: &Object,
+    map: &mut HashMap<ObjectId, Vec<String>>,
+    seen: &mut HashSet<ObjectId>,
+    depth: usize,
+) {
+    if depth > 64 {
+        return;
+    }
+    match obj {
+        Object::Reference(id) => {
+            if seen.insert(*id) {
+                if let Ok(dict) = doc.get_dictionary(*id) {
+                    walk_struct_elem(doc, dict, map, seen, depth);
+                }
+            }
+        }
+        Object::Dictionary(dict) => walk_struct_elem(doc, dict, map, seen, depth),
+        Object::Array(items) => {
+            for item in items {
+                walk_struct_kids(doc, item, map, seen, depth + 1);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn walk_struct_elem(
+    doc: &Document,
+    elem: &Dictionary,
+    map: &mut HashMap<ObjectId, Vec<String>>,
+    seen: &mut HashSet<ObjectId>,
+    depth: usize,
+) {
+    let is_figure =
+        elem.get(b"S").ok().and_then(|o| o.as_name().ok()) == Some(b"Figure".as_slice());
+    if is_figure {
+        if let (Some(caption), Some(page)) = (figure_caption(elem), figure_page(elem)) {
+            map.entry(page).or_default().push(caption);
+        }
+    }
+    if let Ok(kids) = elem.get(b"K") {
+        walk_struct_kids(doc, kids, map, seen, depth + 1);
+    }
+}
+
+fn figure_caption(elem: &Dictionary) -> Option<String> {
+    for key in [b"Alt".as_slice(), b"ActualText".as_slice()] {
+        if let Ok(Object::String(bytes, _)) = elem.get(key) {
+            let text = decode_pdf_text(bytes);
+            if !text.trim().is_empty() {
+                return Some(text);
+            }
+        }
+    }
+    None
+}
+
+fn figure_page(elem: &Dictionary) -> Option<ObjectId> {
+    elem.get(b"Pg").ok().and_then(|o| o.as_reference().ok())
+}
+
+/// Decode a PDF text string: UTF-16BE when it carries a BOM, otherwise lossy UTF-8.
+fn decode_pdf_text(bytes: &[u8]) -> String {
+    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+        let units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16_lossy(&units)
+    } else {
+        String::from_utf8_lossy(bytes).to_string()
+    }
 }
 
 /// Parse the stream crypt filter method (CFM) from the encrypt dictionary.

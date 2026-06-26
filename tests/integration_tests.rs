@@ -2474,3 +2474,210 @@ fn test_debug_and_quiet_conflict() {
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
 }
+
+// ==================== Read tests ====================
+
+#[test]
+fn test_read_markdown_default() {
+    pdfk()
+        .args(&["read", &sample_pdf()])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("# tests/fixtures/sample.pdf")
+                .and(predicate::str::contains("## Page 1"))
+                .and(predicate::str::contains("Hello pdfk!")),
+        );
+}
+
+#[test]
+fn test_read_format_text() {
+    pdfk()
+        .args(&["read", &sample_pdf(), "--format", "text"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("--- Page 1 ---")
+                .and(predicate::str::contains("Hello pdfk!"))
+                .and(predicate::str::contains('#').not()),
+        );
+}
+
+#[test]
+fn test_read_format_json() {
+    let output = pdfk()
+        .args(&["read", &sample_pdf(), "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["encrypted"], false);
+    assert_eq!(json["page_count"], 1);
+    assert_eq!(json["pages"][0]["page"], 1);
+    assert!(json["pages"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_json_alias_matches_format_json() {
+    pdfk()
+        .args(&["read", &sample_pdf(), "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"encrypted\": false"));
+}
+
+#[test]
+fn test_read_json_and_format_conflict() {
+    pdfk()
+        .args(&["read", &sample_pdf(), "--json", "--format", "text"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn test_read_no_headers() {
+    pdfk()
+        .args(&["read", &sample_pdf(), "--no-headers"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Hello pdfk!").and(predicate::str::contains("## Page").not()),
+        );
+}
+
+#[test]
+fn test_read_image_marker_and_caption() {
+    let path = common::ensure_image_pdf();
+    pdfk().args(&["read", path]).assert().success().stdout(
+        predicate::str::contains("![A test image caption](#im1)")
+            .and(predicate::str::contains("100×50")),
+    );
+}
+
+#[test]
+fn test_read_no_images_suppresses_marker() {
+    let path = common::ensure_image_pdf();
+    pdfk()
+        .args(&["read", path, "--no-images"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("![").not());
+}
+
+#[test]
+fn test_read_markdown_escapes_leading_marker() {
+    let path = common::ensure_markdown_pdf();
+    pdfk()
+        .args(&["read", path])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\\# Heading line"));
+}
+
+#[test]
+fn test_read_text_does_not_escape() {
+    let path = common::ensure_markdown_pdf();
+    pdfk()
+        .args(&["read", path, "--format", "text"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# Heading line"));
+}
+
+#[test]
+fn test_read_encrypted_with_password() {
+    pdfk()
+        .args(&[
+            "read",
+            "tests/fixtures/sample_aes_256_r5.pdf",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_encrypted_without_password_fails() {
+    pdfk()
+        .args(&["read", "tests/fixtures/sample_aes_256_r5.pdf"])
+        .write_stdin("")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No password provided"));
+}
+
+#[test]
+fn test_read_encrypted_password_stdin() {
+    pdfk()
+        .args(&[
+            "read",
+            "tests/fixtures/sample_rc4_128.pdf",
+            "--password-stdin",
+        ])
+        .write_stdin("testpass\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_output_to_file() {
+    let tmp = TempDir::new().unwrap();
+    let out = tmp.path().join("notes.md");
+    pdfk()
+        .args(&["read", &sample_pdf(), "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let written = fs::read_to_string(&out).unwrap();
+    assert!(written.contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_output_rejected_for_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let a = tmp.path().join("a.pdf");
+    let b = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &a).unwrap();
+    fs::copy(sample_pdf(), &b).unwrap();
+    pdfk()
+        .args(&[
+            "read",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--output",
+            tmp.path().join("out.md").to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("single input file"));
+}
+
+#[test]
+fn test_read_batch_json_array() {
+    let tmp = TempDir::new().unwrap();
+    let a = tmp.path().join("a.pdf");
+    let b = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &a).unwrap();
+    fs::copy(sample_pdf(), &b).unwrap();
+
+    let output = pdfk()
+        .args(&["read", a.to_str().unwrap(), b.to_str().unwrap(), "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert!(json.is_array());
+    assert_eq!(json.as_array().unwrap().len(), 2);
+}
