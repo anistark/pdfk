@@ -2681,3 +2681,235 @@ fn test_read_batch_json_array() {
     assert!(json.is_array());
     assert_eq!(json.as_array().unwrap().len(), 2);
 }
+
+// ==================== Read: editor/pager handoff ====================
+
+/// A `read` invocation with every editor-related env var cleared, so tests
+/// exercise resolution deterministically regardless of the developer's shell.
+fn pdfk_no_editor_env() -> Command {
+    let mut cmd = pdfk();
+    cmd.env_remove("PDFK_EDITOR")
+        .env_remove("VISUAL")
+        .env_remove("EDITOR")
+        .env_remove("PAGER");
+    cmd
+}
+
+#[test]
+fn test_read_editor_implies_open_and_pipes_via_stdin() {
+    // No --open flag: -e alone must be enough.
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "-e", "cat"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_uses_resolved_editor() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "--editor", "cat"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_propagates_editor_failure() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "-e", "false"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("exited with status 1"));
+}
+
+#[test]
+fn test_read_open_conflicts_with_output() {
+    let tmp = TempDir::new().unwrap();
+    let out = tmp.path().join("notes.md");
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "-o", out.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn test_read_open_rejects_multiple_files() {
+    let tmp = TempDir::new().unwrap();
+    let a = tmp.path().join("a.pdf");
+    let b = tmp.path().join("b.pdf");
+    fs::copy(sample_pdf(), &a).unwrap();
+    fs::copy(sample_pdf(), &b).unwrap();
+
+    pdfk_no_editor_env()
+        .args([
+            "read",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--open",
+            "-e",
+            "cat",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("single input file"));
+}
+
+#[test]
+fn test_read_open_rejects_quiet() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "-e", "cat", "--quiet"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--quiet"));
+}
+
+#[test]
+fn test_read_open_without_editor_and_without_tty_errors() {
+    // Must fail with guidance rather than hang waiting on the menu.
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--editor"));
+}
+
+#[test]
+fn test_read_open_pdfk_editor_takes_precedence() {
+    pdfk_no_editor_env()
+        .env("PDFK_EDITOR", "cat")
+        .env("VISUAL", "false")
+        .env("EDITOR", "false")
+        .env("PAGER", "false")
+        .args(["read", &sample_pdf(), "--open"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_visual_beats_editor() {
+    pdfk_no_editor_env()
+        .env("VISUAL", "cat")
+        .env("EDITOR", "false")
+        .env("PAGER", "false")
+        .args(["read", &sample_pdf(), "--open"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_editor_beats_pager() {
+    pdfk_no_editor_env()
+        .env("EDITOR", "cat")
+        .env("PAGER", "false")
+        .args(["read", &sample_pdf(), "--open"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_falls_back_to_pager() {
+    pdfk_no_editor_env()
+        .env("PAGER", "cat")
+        .args(["read", &sample_pdf(), "--open"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}
+
+#[test]
+fn test_read_open_encrypted_refuses_temp_file_without_allow_temp() {
+    // `true` cannot read stdin, so this would spill a decrypted document to disk.
+    pdfk_no_editor_env()
+        .args([
+            "read",
+            "tests/fixtures/sample_aes_256_r5.pdf",
+            "--password",
+            "testpass",
+            "--open",
+            "-e",
+            "true",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--allow-temp"));
+}
+
+#[test]
+fn test_read_open_encrypted_temp_file_with_allow_temp() {
+    pdfk_no_editor_env()
+        .args([
+            "read",
+            "tests/fixtures/sample_aes_256_r5.pdf",
+            "--password",
+            "testpass",
+            "--open",
+            "-e",
+            "true",
+            "--allow-temp",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_read_open_unencrypted_temp_file_needs_no_flag() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "-e", "true"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_read_allow_temp_without_open_errors() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--allow-temp"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--open"));
+}
+
+#[test]
+fn test_read_open_temp_file_receives_content() {
+    // `head` needs a path, so this exercises the temp-file branch end to end.
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "--open", "-e", "head -1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# "));
+}
+
+#[test]
+fn test_read_open_empty_editor_rejected() {
+    pdfk_no_editor_env()
+        .args(["read", &sample_pdf(), "-e", "   "])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("empty command"));
+}
+
+#[test]
+fn test_read_help_shows_open_flags() {
+    pdfk()
+        .args(["read", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--open"))
+        .stdout(predicate::str::contains("--editor"))
+        .stdout(predicate::str::contains("--allow-temp"));
+}
+
+#[test]
+fn test_read_without_open_still_prints_to_stdout() {
+    // Guards the promise that piping behaviour is unchanged.
+    pdfk_no_editor_env()
+        .env("EDITOR", "false")
+        .args(["read", &sample_pdf()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello pdfk!"));
+}

@@ -131,6 +131,9 @@ pub fn dispatch(cli: Cli) -> Result<()> {
             password_env,
             password_cmd,
             recursive,
+            open,
+            editor,
+            allow_temp,
         } => {
             let format = if json {
                 crate::cli::ReadFormat::Json
@@ -148,6 +151,12 @@ pub fn dispatch(cli: Cli) -> Result<()> {
                 password_env,
                 password_cmd,
                 recursive,
+                read::OpenOptions {
+                    // --editor implies --open
+                    enabled: open || editor.is_some(),
+                    editor,
+                    allow_temp,
+                },
             )
         }
         Command::GenerateMan { out_dir } => generate_man::execute(out_dir),
