@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 use crate::cli::ReadFormat;
 use crate::pdf::reader::{self, PageImage};
 use crate::utils::batch::{self, BatchSummary};
-use crate::utils::{display_path, print_error, print_success, resolve_password, write_stdout};
+use crate::utils::editor;
+use crate::utils::{
+    display_path, is_quiet, print_error, print_success, resolve_password, write_stdout,
+};
 use log::warn;
 use lopdf::Document;
 
@@ -15,6 +18,24 @@ struct ReadOutput {
     encrypted: bool,
     page_count: usize,
     pages: Vec<PageOutput>,
+}
+
+/// How (and whether) to hand the rendered output to an editor or pager.
+pub struct OpenOptions {
+    pub enabled: bool,
+    pub editor: Option<String>,
+    pub allow_temp: bool,
+}
+
+/// Everything `emit` needs to place the rendered output somewhere.
+struct EmitOptions<'a> {
+    format: ReadFormat,
+    no_headers: bool,
+    output: Option<&'a Path>,
+    /// Resolved editor command line, when `--open`/`--editor` was given.
+    open: Option<&'a str>,
+    allow_temp: bool,
+    is_batch: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -37,12 +58,30 @@ pub fn execute(
     password_env: Option<String>,
     password_cmd: Option<String>,
     recursive: bool,
+    open: OpenOptions,
 ) -> Result<()> {
+    if open.allow_temp && !open.enabled {
+        bail!("--allow-temp only applies with --open/--editor");
+    }
+    if open.enabled && is_quiet() {
+        bail!("--open cannot be combined with --quiet");
+    }
+
     let resolved = batch::resolve_files(&files, recursive)?;
 
     if output.is_some() && resolved.len() > 1 {
         bail!("--output can only be used with a single input file");
     }
+    if open.enabled && resolved.len() > 1 {
+        bail!("--open can only be used with a single input file");
+    }
+
+    // Resolve before doing any work, so a missing editor fails fast.
+    let editor_cmd = if open.enabled {
+        Some(editor::resolve_editor(open.editor)?)
+    } else {
+        None
+    };
 
     let is_batch = resolved.len() > 1;
     let pb = batch::create_progress_bar(resolved.len());
@@ -83,10 +122,14 @@ pub fn execute(
             };
             emit(
                 &out,
-                format,
-                no_headers,
-                output.as_deref(),
-                is_batch,
+                &EmitOptions {
+                    format,
+                    no_headers,
+                    output: output.as_deref(),
+                    open: editor_cmd.as_deref(),
+                    allow_temp: open.allow_temp,
+                    is_batch,
+                },
                 &mut json_outputs,
             )
         })();
@@ -193,39 +236,41 @@ fn extract_pages(doc: &Document, no_images: bool) -> Vec<PageOutput> {
     out
 }
 
-fn emit(
-    out: &ReadOutput,
-    format: ReadFormat,
-    no_headers: bool,
-    output: Option<&Path>,
-    is_batch: bool,
-    json_outputs: &mut Vec<ReadOutput>,
-) -> Result<()> {
-    match format {
+fn emit(out: &ReadOutput, opts: &EmitOptions, json_outputs: &mut Vec<ReadOutput>) -> Result<()> {
+    match opts.format {
         ReadFormat::Json => {
-            if is_batch {
+            if opts.is_batch {
                 json_outputs.push(out.clone());
             } else {
-                write_payload(&serde_json::to_string_pretty(out)?, output)?;
+                write_payload(&serde_json::to_string_pretty(out)?, opts, out.encrypted)?;
             }
         }
         ReadFormat::Md | ReadFormat::Text => {
-            let rendered = if format == ReadFormat::Md {
-                render_markdown(out, no_headers)
+            let rendered = if opts.format == ReadFormat::Md {
+                render_markdown(out, opts.no_headers)
             } else {
-                render_text(out, no_headers)
+                render_text(out, opts.no_headers)
             };
-            if output.is_none() && is_batch {
+            if opts.output.is_none() && opts.open.is_none() && opts.is_batch {
                 write_stdout("");
             }
-            write_payload(&rendered, output)?;
+            write_payload(&rendered, opts, out.encrypted)?;
         }
     }
     Ok(())
 }
 
-fn write_payload(content: &str, output: Option<&Path>) -> Result<()> {
-    match output {
+fn write_payload(content: &str, opts: &EmitOptions, encrypted: bool) -> Result<()> {
+    if let Some(cmd) = opts.open {
+        return editor::open_with(
+            cmd,
+            content,
+            opts.format.extension(),
+            opts.allow_temp,
+            encrypted,
+        );
+    }
+    match opts.output {
         Some(path) => {
             std::fs::write(path, content)
                 .with_context(|| format!("Failed to write {}", path.display()))?;

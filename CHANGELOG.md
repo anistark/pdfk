@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased](https://github.com/anistark/pdfk/compare/v0.3.0...HEAD)
 
 ### Added
+- **`--open` / `-e, --editor` on `read`**: hand the extracted content to an editor or pager instead of stdout
+  - Resolution order: `--editor` > `$PDFK_EDITOR` > `$VISUAL` > `$EDITOR` > `$PAGER` > interactive menu of editors found on `PATH`
+  - The menu is TTY-gated; scripts and CI get a clear error instead of a hang
+  - Pipes to the program's stdin where supported (`less`, `bat`, `glow`, `vim -`, `nvim -`) so decrypted content never touches disk
+  - Otherwise uses a `0600` temp file removed on exit; for **encrypted** PDFs that requires the new `--allow-temp` flag
+  - Conflicts with `--output`, `--quiet`, and multiple inputs; the editor's exit status propagates
+  - Piping is unchanged — without `--open`, `read` still writes to stdout
 - **`pdfk read` command**: Extract a PDF's content as Markdown (default), plain text, or JSON
   - `--format md|text|json` (default `md`); `--json` kept as a shorthand for `--format json`
   - Markdown output adds `# <file>` / `## Page N` headings, references images as `![caption](#anchor) <!-- W×H -->`, and lightly escapes body text so stray `#`/`-`/`>` don't render as formatting
@@ -56,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `env_logger` 0.11
 - Added `clap_mangen` 0.2
 - Added `clap_complete` 4.6
+- Promoted `tempfile` 3.27 to a runtime dependency (temp-file path for `read --open`)
 
 ### Tools
 - **Man page generation**: Run `just man` to generate roff man pages into `./man/` — produces `pdfk.1` plus one page per subcommand (`pdfk-lock.1`, `pdfk-unlock.1`, etc.)

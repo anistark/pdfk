@@ -12,6 +12,17 @@ pub enum ReadFormat {
     Json,
 }
 
+impl ReadFormat {
+    /// File extension for this format, so editors syntax-highlight correctly.
+    pub fn extension(self) -> &'static str {
+        match self {
+            ReadFormat::Md => ".md",
+            ReadFormat::Text => ".txt",
+            ReadFormat::Json => ".json",
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "pdfk",
@@ -314,6 +325,18 @@ pub enum Command {
         /// Process folders recursively
         #[arg(short = 'R', long)]
         recursive: bool,
+
+        /// Open the output in an editor or pager instead of printing it
+        #[arg(long, conflicts_with = "output")]
+        open: bool,
+
+        /// Program to open the output with (implies --open)
+        #[arg(short = 'e', long, value_name = "CMD", conflicts_with = "output")]
+        editor: Option<String>,
+
+        /// Allow writing a decrypted document to a temp file when the editor needs a path
+        #[arg(long)]
+        allow_temp: bool,
     },
 }
 

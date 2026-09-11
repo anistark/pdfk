@@ -239,6 +239,33 @@ echo "$PASS" | pdfk read secret.pdf --password-stdin
 pdfk read report.pdf --format json | jq -r '.pages[].text'
 ```
 
+#### Read it in your editor
+
+`--open` hands the output to your editor or pager instead of printing it:
+
+```sh
+pdfk read document.pdf --open            # uses $EDITOR / $VISUAL / $PAGER
+pdfk read document.pdf -e nvim           # pick one explicitly
+pdfk read document.pdf -e 'bat -l md'    # any command works
+```
+
+Resolution order is `--editor`, `$PDFK_EDITOR`, `$VISUAL`, `$EDITOR`, `$PAGER`,
+then an interactive menu of editors found on your `PATH`. In a script or CI —
+anywhere without a terminal — it fails with a clear message instead of hanging
+on a prompt.
+
+Content is piped to the program's **stdin** whenever it can read stdin (`less`,
+`bat`, `glow`, `vim -`, `nvim -`), so a decrypted document never touches disk.
+Editors that need a real path get a `0600` temp file that is removed on exit —
+and for an encrypted PDF that requires `--allow-temp`, so nothing is written out
+without you asking:
+
+```sh
+pdfk read secret.pdf --password-stdin --open -e nano --allow-temp
+```
+
+Piping is unaffected: without `--open`, `pdfk read` still writes to stdout.
+
 The reader is resilient: pages with unsupported fonts or undecodable bytes are
 reported inline (`> ⚠️ …` in Markdown, `[!] …` in text, a `warnings[]` array in
 JSON) rather than aborting the whole document. Images are noted even when no
